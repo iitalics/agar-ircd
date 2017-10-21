@@ -16,22 +16,26 @@ let ( <<< ) p1 p2 =
 let ( <&> ) p1 p2 =
   p1 >>= (fun x -> P.post_map (fun y -> x, y) p2)
 
+let ( => ) x f = P.post_map f x
+
 (** character patterns **)
 let nospcrlfcl = C.none_of ['\x00'; '\r'; '\n'; ' '; ':']
 let nospcrlf   = C.none_of ['\x00'; '\r'; '\n'; ' ']
 let nocrlf     = C.none_of ['\x00'; '\r'; '\n']
 
 (** prefix ":xyz... " **)
-let prefix : string option p =
-  ~? (C.char ':'
-      >>> P.must (~+ nospcrlf
-                  <<< C.char ' '
-                  |> P.post_map String.of_list))
+let prefix =
+  let pfx =
+    ~+ nospcrlf
+    <<< C.char ' '
+    => String.of_list
+  in
+  P.maybe (C.char ':' >>> P.must pfx)
 
 (** command: "abc..."/"123" **)
 let command =
-  (~+ C.letter) <|> (C.digit ^^ 3)
-  |> P.post_map String.of_list
+  ((~+ C.letter) <|> (C.digit ^^ 3))
+  => String.of_list
 
 (** params: " xy zw :trailing..." **)
 let params =
@@ -39,28 +43,26 @@ let params =
     C.char ' '
     >>> P.cons
           nospcrlfcl
-          (~* nospcrlf)
-    |> P.post_map String.of_list
+          (P.must (~* nospcrlf))
+    => String.of_list
   in
   let trailing_param =
-    C.string " :" >>> (~* nocrlf)
-    |> P.post_map String.of_list
-  in
-  let combine (ps,maybe_last) =
-    match maybe_last with
-    | Some p -> ps @ [p]
-    | None -> ps
+    C.string " :"
+    >>> (~* nocrlf)
+    => String.of_list
   in
   (~* middle_param) <&> (~? trailing_param)
-  |> P.post_map combine
+  => function
+    | ps, Some p' -> ps @ [p']
+    | ps, None    -> ps
 
 (** entire message **)
 let raw_message =
   (prefix <&> command <&> params) <<< C.string "\r\n"
-  >>= (fun ((pfx,cmd),ps) ->
-    P.return { Msg.raw_pfx = pfx;
-               Msg.raw_cmd = cmd;
-               Msg.raw_params = ps })
+  => fun ((pfx,cmd),ps) ->
+     { Msg.raw_pfx = pfx;
+       Msg.raw_cmd = cmd;
+       Msg.raw_params = ps }
 
 
 
