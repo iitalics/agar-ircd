@@ -42,23 +42,23 @@ let nickname = P.cons
 
 (** prefix ":xyz... " **)
 let prefix =
-  let pfx_server =
-    hostname
-    => fun s ->
-       Msg.Prefix_server s
-  in
+  let maybe_un = P.maybe (C.char '!' >>> P.must username) in
+  let maybe_hn = P.maybe (C.char '@' >>> P.must hostname) in
 
-  let maybe_un = P.maybe (C.char '!' >>> username) in
-  let maybe_hn = P.maybe (C.char '@' >>> hostname) in
   let pfx_user =
     (nickname <&> maybe_un <&> maybe_hn)
     => fun ((nick,user),host) ->
        Msg.Prefix_user (nick, user, host)
   in
 
-  C.char ':'
-  >>> (pfx_server <|> pfx_user)
-  <<< C.char ' '
+  let pfx_server =
+    hostname
+    => fun s ->
+       Msg.Prefix_server s
+  in
+
+  let pfx = pfx_server <|> pfx_user in
+  C.char ':' >>> (P.must pfx <<< C.char ' ')
 
 (** command: "abc..."/"123" **)
 let command =
@@ -76,7 +76,7 @@ let params =
   in
   let trailing_param =
     C.string " :"
-    >>> (~* nocrlf)
+    >>> P.must (~* nocrlf)
     => String.of_list
   in
   (~* middle_param) <&> (~? trailing_param)
