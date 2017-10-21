@@ -8,6 +8,6 @@ let () =
 let _ =
   OU.test_list
     [
-      Msg_parse.Test.tests;
+      Msg_parse_tests.tests;
     ]
   |> OU.run_test_tt_main
