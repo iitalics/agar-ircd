@@ -126,6 +126,8 @@ module Test = struct
       parses_to pp raw_message     "PRIVMSG a b\r\n" (msg "PRIVMSG" ["a";"b"]);
       parses_to pp raw_message     "PRIVMSG a :b c\r\n" (msg "PRIVMSG" ["a";"b c"]);
       parses_to pp raw_message     "PRIVMSG a b :c d e\r\n" (msg "PRIVMSG" ["a";"b";"c d e"]);
+      parses_to pp raw_message     "PRIVMSG :\r\n" (msg "PRIVMSG" [""]);
+      parses_to pp raw_message     "PRIVMSG : :\r\n" (msg "PRIVMSG" [" :"]);
       parses_to pp raw_message     ":origin 123\r\n" (msg ?pfx:(Some "origin") "123" []);
       parses_to pp raw_message     ":place QUIT :eating lunch\r\n"
         (msg ?pfx:(Some "place")
@@ -135,6 +137,7 @@ module Test = struct
       parse_fails raw_message      "1234\r\n";
       parse_fails raw_message      "PRIVMSG a \rb\r\n";
       parse_fails raw_message      "PRIVMSG a\x00bc\r\n";
+      parse_fails raw_message      "PRIVMSG a  b\r\n";
     end
 
   let tests =
