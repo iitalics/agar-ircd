@@ -3,25 +3,30 @@ module P = ParserCo
 module C = CharParser
 open ParserCo.Infix
 
-(* parsers from chars to stuff *)
-type 'a p = (char, 'a, C.position) P.t
 
-(* some extra combinators *)
+(* extra combinators ****************************************)
 
-(** like >>>, but returns the first arg and ignores the result of the second **)
+(** like >>>, but returns the first arg and ignores the result
+    of the second **)
 let ( <<< ) p1 p2 =
-  p1 >>= (fun x -> p2 >>> P.return x)
+  p1 >>= fun x -> p2 >>> P.return x
+
+(** post_map in reverse order **)
+let ( => ) x f = P.post_map f x
 
 (** collect two things and put them in a pair **)
 let ( <&> ) p1 p2 =
-  p1 >>= (fun x -> P.post_map (fun y -> x, y) p2)
+  p1 >>= fun x -> p2 => fun y -> x, y
 
-let ( => ) x f = P.post_map f x
 
-(** character patterns **)
+(* character patterns ***************************************)
+
 let nospcrlfcl = C.none_of ['\x00'; '\r'; '\n'; ' '; ':']
 let nospcrlf   = C.none_of ['\x00'; '\r'; '\n'; ' ']
 let nocrlf     = C.none_of ['\x00'; '\r'; '\n']
+
+
+(* parsers **************************************************)
 
 (** prefix ":xyz... " **)
 let prefix =
@@ -34,12 +39,12 @@ let prefix =
 
 (** command: "abc..."/"123" **)
 let command =
-  ((~+ C.letter) <|> (C.digit ^^ 3))
+  (~+ C.letter) <|> (C.digit ^^ 3)
   => String.of_list
 
 (** params: " xy zw :trailing..." **)
 let params =
-  let middle_param   =
+  let middle_param =
     C.char ' '
     >>> P.cons
           nospcrlfcl
@@ -66,7 +71,9 @@ let raw_message =
 
 
 
-(****************************************************)
+
+(* tests ****************************************************)
+
 module Test = struct
   open OUnit2
   let fmt = Printf.sprintf
@@ -87,7 +94,7 @@ module Test = struct
     | Bad x -> assert_bool "ok" true
 
 
-  let pfx_test _ = begin
+  let prefix_test _ = begin
       let pp = function
         | None -> "None"
         | Some x -> fmt "Some(%S)" x
@@ -144,7 +151,7 @@ module Test = struct
 
   let tests =
     "test.msg_parse"
-    >::: [ "prefix" >:: pfx_test
+    >::: [ "prefix" >:: prefix_test
          ; "params" >:: params_test
          ; "message" >:: message_test
          ]
