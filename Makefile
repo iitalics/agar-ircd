@@ -1,6 +1,7 @@
 SRC=src
 
-OC=ocamlbuild \
+OC = ocamlbuild \
+	-j 4 \
 	-cflag -thread \
 	-ocamlopt "ocamlopt -thread" \
 	-I $(SRC) -use-ocamlfind
