@@ -3,7 +3,7 @@ open Irc_common
 
 type prefix
   = Prefix_server of server_name
-  | Prefix_user of nick_name * string * string
+  | Prefix_user of nick_name * string option * server_name option
 
 type raw = {
     raw_pfx : prefix option;
