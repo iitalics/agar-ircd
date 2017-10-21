@@ -1,8 +1,12 @@
 open Batteries
 open Irc_common
 
+type prefix
+  = Prefix_server of server_name
+  | Prefix_user of nick_name * string * string
+
 type raw = {
-    raw_pfx : string option;
+    raw_pfx : prefix option;
     raw_cmd : string;
     raw_params : string list;
   }
@@ -17,7 +21,7 @@ type t =
   | SERVICE of unit
   | QUIT of string option
   | SQUIT of string * string
-  | AWAY of string option       (* optional *)
+  | AWAY of string option
 
   (* channel operations *)
   | JOIN of (chan_name * string option) list

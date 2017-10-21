@@ -65,7 +65,7 @@ let params =
 let raw_message =
   (prefix <&> command <&> params) <<< C.string "\r\n"
   => fun ((pfx,cmd),ps) ->
-     { Msg.raw_pfx = pfx;
+     { Msg.raw_pfx = pfx |> Option.map (fun x -> Msg.Prefix_server x);
        Msg.raw_cmd = cmd;
        Msg.raw_params = ps }
 
@@ -116,8 +116,13 @@ module Test = struct
     end
 
   let message_test _ = begin
-      let msg ?pfx cmd pars =
-        { Msg.raw_pfx = pfx;
+      let msg cmd pars =
+        { Msg.raw_pfx = None;
+          Msg.raw_cmd = cmd;
+          Msg.raw_params = pars }
+      in
+      let msg_pfx_server srv cmd pars =
+        { Msg.raw_pfx = Some (Msg.Prefix_server srv);
           Msg.raw_cmd = cmd;
           Msg.raw_params = pars }
       in
@@ -125,7 +130,8 @@ module Test = struct
         let open Msg in
         fmt "%s%S %s"
           (match m.raw_pfx with
-           | Some x -> fmt "{prefix %S}" x
+           | Some (Msg.Prefix_server x) -> fmt "{prefix %S}" x
+           | Some _ -> "{prefix ..}"
            | None -> "")
           m.raw_cmd
           (String.concat ";" (List.map (fmt "%S") m.raw_params))
@@ -137,10 +143,8 @@ module Test = struct
       parses_to pp raw_message     "PRIVMSG a b :c d e\r\n" (msg "PRIVMSG" ["a";"b";"c d e"]);
       parses_to pp raw_message     "PRIVMSG :\r\n" (msg "PRIVMSG" [""]);
       parses_to pp raw_message     "PRIVMSG : :\r\n" (msg "PRIVMSG" [" :"]);
-      parses_to pp raw_message     ":origin 123\r\n" (msg ?pfx:(Some "origin") "123" []);
-      parses_to pp raw_message     ":place QUIT :eating lunch\r\n"
-        (msg ?pfx:(Some "place")
-           "QUIT" ["eating lunch"]);
+      parses_to pp raw_message     ":origin 123\r\n" (msg_pfx_server "origin" "123" []);
+      parses_to pp raw_message     ":place QUIT :eating lunch\r\n" (msg_pfx_server "place" "QUIT" ["eating lunch"]);
 
       parse_fails raw_message      "QUIT";
       parse_fails raw_message      "1234\r\n";
