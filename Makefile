@@ -10,7 +10,10 @@ all: main.native
 main.native:
 	$(OC) $@
 
+test:
+	$(OC) test.native && ./test.native
+
 clean:
 	rm -rf _build main.native
 
-.PHONY: all main.native clean
+.PHONY: all test main.native clean

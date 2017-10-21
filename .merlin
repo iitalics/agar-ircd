@@ -1,4 +1,4 @@
 S src
 B _build/**
 B +threads
-PKG batteries threads
+PKG oUnit batteries threads
