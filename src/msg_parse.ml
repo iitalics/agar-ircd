@@ -33,7 +33,7 @@ let hostchr    = alphanum <|> C.char '.'
 
 (* parsers **************************************************)
 
-let hostname = (~+ hostchr) => String.of_list
+let hostname = P.filter (List.mem '.') (~+ hostchr) => String.of_list
 let username = (~+ nospcrlfat) => String.of_list
 let nickname = P.cons
                  (C.letter <|> special)
@@ -57,7 +57,7 @@ let prefix =
   in
 
   C.char ':'
-  >>> (pfx_user <|> pfx_server)
+  >>> (pfx_server <|> pfx_user)
   <<< C.char ' '
 
 (** command: "abc..."/"123" **)
@@ -108,7 +108,8 @@ module Test = struct
                 ~msg:(fmt "parsing %S" s)
                 ~printer:pp
                 e a
-    | Bad x -> assert_failure (fmt "failed to parse %S" s)
+    | Bad x ->
+       assert_failure (fmt "failed to parse %S" s)
 
   (** assert that parsing 's' with 'p' fails **)
   let parse_fails p s =
@@ -131,11 +132,12 @@ module Test = struct
 
       parses_to identity (hostname <<< P.eof)   "server.org"  "server.org";
 
-      parses_to pp prefix    ":nick!usr@host " (pfx_usr "nick" (Some "usr") (Some "host"));
+      parses_to pp prefix    ":nick!usr@host.com " (pfx_usr "nick" (Some "usr") (Some "host.com"));
       parses_to pp prefix    ":nick!usr " (pfx_usr "nick" (Some "usr") None);
       parses_to pp prefix    ":nick " (pfx_usr "nick" None None);
       parses_to pp prefix    ":0.1.2.3 " (pfx_srv "0.1.2.3");
-      (* parses_to pp prefix    ":server.org " (pfx_srv "server.org"); *)
+      parses_to pp prefix    ":123.1.2.64 " (pfx_srv "123.1.2.64");
+      parses_to pp prefix    ":server.org " (pfx_srv "server.org");
       parse_fails prefix     ":";
       parse_fails prefix     ":abcfds\r\n";
     end
@@ -147,6 +149,8 @@ module Test = struct
       parses_to pp params    " a b c" ["a";"b";"c"];
       parses_to pp params    "" [];
       parses_to pp params    " a :b c" ["a";"b c"];
+      parse_fails (params <<< P.eof) "a";
+      parse_fails (params <<< P.eof) " a\nb";
     end
 
   let message_test _ = begin
@@ -182,8 +186,7 @@ module Test = struct
       parses_to pp raw_message     "PRIVMSG a b :c d e\r\n" (msg "PRIVMSG" ["a";"b";"c d e"]);
       parses_to pp raw_message     "PRIVMSG :\r\n" (msg "PRIVMSG" [""]);
       parses_to pp raw_message     "PRIVMSG : :\r\n" (msg "PRIVMSG" [" :"]);
-      parses_to pp raw_message     ":s.org 123\r\n" (msg_pfx_server "s.org" "123" []);
-      (* parses_to pp raw_message     ":se.org 123\r\n" (msg_pfx_server "se.org" "123" []); *)
+      parses_to pp raw_message     ":server.org 123\r\n" (msg_pfx_server "server.org" "123" []);
       parses_to pp raw_message     ":milo QUIT :eating lunch\r\n" (msg_pfx_nick "milo" "QUIT" ["eating lunch"]);
 
       parse_fails raw_message      "QUIT";
