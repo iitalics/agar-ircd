@@ -61,3 +61,28 @@ type full =
   | PING of server_name * server_name option
   | PONG of server_name * server_name option
   | ERROR of string
+
+
+(** convert a message back into a string (w/o CR LF) **)
+let to_string m =
+  let open Printf in
+  let prefix_str =
+    match m.raw_pfx with
+    | None -> ""
+    | Some (Prefix_server s) ->
+       sprintf ":%s " s
+    | Some (Prefix_user (nick, usr, hom)) ->
+       sprintf ":%s%s%s "
+         nick
+         (Option.map_default ((^) "!") "" usr)
+         (Option.map_default ((^) "@") "" hom)
+  in
+  let params_str =
+    let rec f = function
+      | [] -> ""
+      | [x] -> " :" ^ x
+      | x::xs -> " " ^ x ^ f xs
+    in
+    f m.raw_params
+  in
+  prefix_str ^ m.raw_cmd ^ params_str
