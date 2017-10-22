@@ -87,6 +87,13 @@ let to_string m =
   in
   prefix_str ^ m.raw_cmd ^ params_str
 
-
+(** gives the message 'm' the prefix 'pfx' **)
 let with_prefix pfx m =
   { m with raw_pfx = Some pfx }
+
+
+
+let simple cmd pars = {
+    raw_pfx = None;
+    raw_cmd = cmd;
+    raw_params = pars }

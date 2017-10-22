@@ -49,9 +49,9 @@ let prefix_test _ = begin
     parse_fails prefix     ":abc\nd";
   end
 
+
 let command_test _ = begin
     let pp = identity in
-
     parses_to pp command  "ABC" "ABC";
     parses_to pp command  "   ABC" "ABC";
     parses_to pp command  " PRIVMSG" "PRIVMSG";
@@ -61,6 +61,7 @@ let command_test _ = begin
     parse_fails command   " abc";
     parse_fails command   " AB4";
   end
+
 
 let params_test _ = begin
     let pp ss =
@@ -75,21 +76,14 @@ let params_test _ = begin
     parse_fails (params <<< P.eof) " a\nb";
   end
 
+
 let message_test _ = begin
-    let msg cmd pars =
-      { Msg.raw_pfx = None;
-        Msg.raw_cmd = cmd;
-        Msg.raw_params = pars }
-    in
+    let msg = Msg.simple in
     let msg_pfx_server srv cmd pars =
-      { Msg.raw_pfx = Some (Msg.Prefix_server srv);
-        Msg.raw_cmd = cmd;
-        Msg.raw_params = pars }
+      Msg.with_prefix (Msg.Prefix_server srv) (msg cmd pars)
     in
     let msg_pfx_nick nick cmd pars =
-      { Msg.raw_pfx = Some (Msg.Prefix_user (nick, None, None));
-        Msg.raw_cmd = cmd;
-        Msg.raw_params = pars }
+      Msg.with_prefix (Msg.Prefix_user (nick, None, None)) (msg cmd pars)
     in
     let pp m =
       let open Msg in
