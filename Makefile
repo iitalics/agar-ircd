@@ -1,11 +1,17 @@
 
 OC = ocamlbuild \
+	-use-ocamlfind \
 	-j 4 \
 	-cflag -thread \
-	-ocamlopt "ocamlopt -thread" \
-	-I src -use-ocamlfind
+	-ocamlopt "ocamlopt $(OCOPT_FLAGS)" \
+	-I src
+
+OCOPT_FLAGS = -thread
 
 all: main.native
+
+release: OCOPT_FLAGS+= -O3
+release: main.native
 
 main.native:
 	$(OC) $@
