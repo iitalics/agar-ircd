@@ -14,7 +14,7 @@ module type MONAD = sig
   val put_s : state -> unit t
 
   val quit : 'a t
-  val send : Routing.target -> string -> unit t
+  val send : int -> string -> unit t
 
 end
 
@@ -22,7 +22,7 @@ end
 module type FUNC =
   functor(M : MONAD) -> sig
 
-    val init : state M.t
+    val init : unit -> state
     val recv : string -> unit M.t
     val discon : unit M.t
 
@@ -40,15 +40,14 @@ module Make : FUNC =
 
     let send_back s =
       M.con_id >>= fun i ->
-      M.send (Routing.To_con i) s
+      M.send i s
 
 
     (* implementation ********************)
 
 
     (** initialize the child actor **)
-    let init =
-      M.return Waiting_nick
+    let init () = Waiting_nick
 
     (** process a parsed message **)
     let recv_msg m =

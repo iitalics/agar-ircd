@@ -16,8 +16,8 @@ module Console = struct
   let put_s s () = state := Some s
 
   let quit () = raise Quit
-  let send tgt s () =
-    Printf.printf "sending to %s:\n" (Routing.string_of_target tgt);
+  let send i s () =
+    Printf.printf "sending to con #%d:\n" i;
     print_string s;
     flush IO.stdout
 
@@ -30,7 +30,7 @@ let _ =
   let module C = Console in
   let module H = Child.Make(C) in
 
-  C.run (C.bind H.init C.put_s);
+  C.state := Some (H.init ());
   try
     while true do
       print_string "> ";
