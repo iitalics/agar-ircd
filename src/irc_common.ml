@@ -6,5 +6,15 @@ type host_name = string
 type chan_name = string
 type mask = string
 
-type user_mode = [ `a | `i | `w | `r | `o | `O | `s ]
-type stats_query = [ `l | `m | `o | `u ]
+type user_mode =
+  [ `i (* invisible *)
+  | `w (* wallops *)
+  | `o (* operator *)
+  | `s (* recieves server notices *)
+  ]
+
+type stats_query = char
+
+
+
+let server_name = ref "test.irc"

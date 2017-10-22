@@ -4,7 +4,7 @@ open Irc_common
 type state
   = Waiting_nick
   | Waiting_user of nick_name
-  | User of nick_name * user_name * user_mode list * string
+  | LoggedIn of nick_name
 
 module type MONAD = sig
   include Monad.SIG
@@ -13,8 +13,8 @@ module type MONAD = sig
   val get_s : state t
   val put_s : state -> unit t
 
-  val quit : 'a t
   val send : int -> string -> unit t
+  val quit : 'a t
 
 end
 

@@ -9,5 +9,6 @@ let _ =
   OU.test_list
     [
       Msg_parse_tests.tests;
+      Child_tests.tests;
     ]
   |> OU.run_test_tt_main
