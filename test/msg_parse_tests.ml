@@ -49,6 +49,19 @@ let prefix_test _ = begin
     parse_fails prefix     ":abc\nd";
   end
 
+let command_test _ = begin
+    let pp = identity in
+
+    parses_to pp command  "ABC" "ABC";
+    parses_to pp command  "   ABC" "ABC";
+    parses_to pp command  " PRIVMSG" "PRIVMSG";
+    parses_to pp command  " 123" "123";
+    parses_to pp command  " 685" "685";
+    parse_fails command   " ";
+    parse_fails command   " abc";
+    parse_fails command   " AB4";
+  end
+
 let params_test _ = begin
     let pp ss =
       List.map (fmt "%S") ss
@@ -114,6 +127,7 @@ let tests =
   "test.msg_parse"
   >::: [
       "prefix" >:: prefix_test;
+      "command" >:: command_test;
       "params" >:: params_test;
       "message" >:: message_test;
     ]

@@ -94,7 +94,7 @@ let prefix =
       <digit x 3>
  **)
 let command =
-  ~? sp >>> ((~+ C.letter) <|> (C.digit ^^ 3))
+  ~? sp >>> ((~+ C.uppercase) <|> (C.digit ^^ 3))
   => String.of_list
 
 
