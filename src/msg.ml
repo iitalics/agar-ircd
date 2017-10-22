@@ -66,7 +66,7 @@ type full =
   | ERROR of string
 
 
-(** convert a message back into a string (w/o CR LF) **)
+(** convert a message back into a string **)
 let to_string m =
   let open Printf in
   let prefix_str =
@@ -88,7 +88,7 @@ let to_string m =
     in
     f m.raw_params
   in
-  prefix_str ^ m.raw_cmd ^ params_str
+  prefix_str ^ m.raw_cmd ^ params_str ^ "\r\n"
 
 (** gives the message 'm' the prefix 'pfx' **)
 let with_prefix pfx m =
@@ -115,8 +115,8 @@ let simple1 cmd par = {
 module Errors = struct
   open Printf
 
-  let _UNKNOWNCOMMAND n c = simple "421" [n; c; "Unknown command"]
-  let _NEEDMOREPARAMS n c = simple "461" [n; c; "Not enough parameters"]
-  let _ALREADYREGISTERED n c = simple "462" [n; c; "You may not register"]
+  let _UNKNOWNCOMMAND c nic = simple "421" [nic; c; "Unknown command"]
+  let _NEEDMOREPARAMS c nic = simple "461" [nic; c; "Not enough parameters"]
+  let _ALREADYREGISTERED nic = simple "462" [nic; "You may not register"]
 
 end

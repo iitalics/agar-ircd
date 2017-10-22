@@ -42,6 +42,23 @@ module Make : FUNC =
       M.con_id >>= fun i ->
       M.send i s
 
+    let my_nick =
+      M.get_s =>
+        function
+        | Waiting_nick -> "*"
+        | Waiting_user n -> n
+        | LoggedIn n -> n
+
+    let with_server_prefix m =
+      Msg.with_prefix
+        (Msg.Prefix_server (!Irc_common.server_name))
+        m
+
+    let send_err f =
+      my_nick >>= fun nic ->
+      send_back (Msg.to_string
+                   (with_server_prefix (f nic)))
+
 
     (* implementation ********************)
 
@@ -51,12 +68,12 @@ module Make : FUNC =
 
     (** process a parsed message **)
     let recv_msg m =
-      if m.Msg.raw_cmd = "QUIT" then
-        M.quit
-      else
-        let m' = Msg.with_prefix (Msg.Prefix_server "irc.node") m in
-        let str =  Msg.to_string m' ^ "\r\n" in
-        send_back str
+      (* let prefix = m.Msg.raw_pfx in *)
+      let cmd = m.Msg.raw_cmd in
+      (* let params = m.Msg.raw_params in *)
+      match cmd with
+      | "QUIT" -> M.quit
+      | _ -> send_err (Msg.Errors._UNKNOWNCOMMAND cmd)
 
     (** process just a string input **)
     let recv s =
