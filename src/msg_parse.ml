@@ -36,61 +36,97 @@ let hostchr    = alphanum <|> C.char '.'
 
 (* parsers **************************************************)
 
-let hostname = P.filter (List.mem '.') (~+ hostchr) => String.of_list
-let username = (~+ nospcrlfat) => String.of_list
-let nickname = P.cons
-                 (C.letter <|> special)
-                 (~+ nickchr)
-               => String.of_list
+let sp =
+  P.ignore_one_plus (C.char ' ')
 
-(** prefix ":xyz... " **)
+let nickname =
+  P.cons
+    (C.letter <|> special)
+    (~* nickchr)
+  => String.of_list
+
+let username =
+  (~+ nospcrlfat)
+  => String.of_list
+
+let hostname =
+  (~+ hostchr)
+  |> P.filter (fun chrs ->
+         List.length chrs > 2
+         && List.mem '.' chrs)
+  => String.of_list
+
+
+(** prefix
+      :<hostname>
+    or
+      :<nick>[!<user>][@<host>]
+ **)
 let prefix =
-  let maybe_un = P.maybe (C.char '!' >>> P.must username) in
-  let maybe_hn = P.maybe (C.char '@' >>> P.must hostname) in
 
-  let pfx_user =
+  let maybe_un = ~? (C.char '!' >>> P.must username) in
+  let maybe_hn = ~? (C.char '@' >>> P.must hostname) in
+
+  let nick_user_host =
     (nickname <&> maybe_un <&> maybe_hn)
-    => fun ((nick,user),host) ->
-       Msg.Prefix_user (nick, user, host)
+    => fun ((n,u),h) ->
+       Msg.Prefix_user (n, u, h)
   in
 
-  let pfx_server =
+  let servername =
     hostname
     => fun s ->
        Msg.Prefix_server s
   in
 
-  let pfx = pfx_server <|> pfx_user in
-  C.char ':' >>> (P.must pfx <<< C.char ' ')
+  C.char ':' >>= fun _ ->
+  P.must
+    (~+ nospcrlf >>= fun chrs ->
+     match P.run (servername <|> nick_user_host)
+             (C.source_of_enum (List.enum chrs)) with
+     | Ok p -> P.return p
+     | Bad _ -> P.fail)
 
-(** command: "abc..."/"123" **)
+
+(** command
+      <letter>+
+    or
+      <digit x 3>
+ **)
 let command =
-  (~+ C.letter) <|> (C.digit ^^ 3)
+  ~? sp >>> ((~+ C.letter) <|> (C.digit ^^ 3))
   => String.of_list
 
-(** params: " xy zw :trailing..." **)
-let params =
-  let middle_param =
-    C.char ' '
-    >>> P.cons
-          nospcrlfcl
-          (P.must (~* nospcrlf))
-    => String.of_list
-  in
-  let trailing_param =
-    C.string " :"
-    >>> P.must (~* nocrlf)
-    => String.of_list
-  in
-  (~* middle_param) <&> (~? trailing_param)
-  => function
-    | ps, Some p' -> ps @ [p']
-    | ps, None    -> ps
 
-(** entire message **)
-let raw_message =
+(** params
+     <middle>+ [:<any>*]
+ **)
+let params =
+
+  let middle =
+    sp >>> (nospcrlfcl >:: ~* nospcrlf)
+    => String.of_list
+  in
+
+  let trailing =
+    sp
+    >>> C.char ':'
+    >>> ~* nocrlf
+    => String.of_list
+  in
+
+  (~* middle <&> ~? trailing)
+  => function
+    | ps, Some p -> ps @ [p]
+    | ps, None   -> ps
+
+
+(** message:
+      <prefix>? <command> <params> \r\n
+ **)
+let message =
   (~? prefix <&> command <&> params) <<< C.string "\r\n"
-  => fun ((pfx,cmd),ps) ->
+  => fun ((pfx,cmd),pars) ->
      { Msg.raw_pfx = pfx;
        Msg.raw_cmd = cmd;
-       Msg.raw_params = ps }
+       Msg.raw_params = pars }
