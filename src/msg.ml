@@ -86,3 +86,7 @@ let to_string m =
     f m.raw_params
   in
   prefix_str ^ m.raw_cmd ^ params_str
+
+
+let with_prefix pfx m =
+  { m with raw_pfx = Some pfx }

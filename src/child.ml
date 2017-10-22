@@ -20,7 +20,7 @@ module type FUNC =
   end
 
 
-module Make =
+module Make : FUNC =
   functor(M : MONAD) -> struct
     module Infix = Monad.Infix(M)
     open Infix
@@ -34,11 +34,23 @@ module Make =
       M.send (Routing.To_con i) s
 
     let recv s =
-      match CharParser.parse Msg_parse.message s with
-      | Bad _ -> send_back "invalid message\r\n"
-      | Ok m ->
-         let m' = { m with Msg.raw_pfx = Some (Msg.Prefix_server "irc.node") } in
-         send_back (Msg.to_string m' ^ "\r\n")
+      (match CharParser.parse Msg_parse.message s with
+        | Bad _ ->
+           M.return {
+               Msg.raw_pfx = None;
+               Msg.raw_cmd = "421";
+               Msg.raw_params = ["Unknown command"] }
+
+        | Ok m ->
+           if m.Msg.raw_cmd = "QUIT" then
+             M.quit
+           else
+             M.return m)
+
+      >>= fun m ->
+      let m' = Msg.with_prefix (Msg.Prefix_server "irc.node") m in
+      send_back (Msg.to_string m' ^ "\r\n")
+
 
     let discon =
       M.return ()

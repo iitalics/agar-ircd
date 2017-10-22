@@ -5,10 +5,10 @@ module Console = struct
   exception Quit
 
   type 'a t = unit -> 'a
-  let run : 'a t -> 'a = fun f -> f ()
+  let run f = f ()
 
-  let return = const
   let bind m f = f (m ())
+  let return = const
   let map = (%)
 
   let con_id () = 0
@@ -36,5 +36,5 @@ let _ =
       C.run (H.recv line)
     done
   with
-  | C.Quit -> print_string "client quit.\n"
+  | C.Quit -> print_string "quit.\n"
   | End_of_file -> ()
