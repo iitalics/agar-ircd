@@ -29,9 +29,16 @@ module Make =
     let init =
       M.return ()
 
-    let recv s =
+    let send_back s =
       M.con_id >>= fun i ->
       M.send (Routing.To_con i) s
+
+    let recv s =
+      match CharParser.parse Msg_parse.message s with
+      | Bad _ -> send_back "invalid message\r\n"
+      | Ok m ->
+         let m' = { m with Msg.raw_pfx = Some (Msg.Prefix_server "irc.node") } in
+         send_back (Msg.to_string m' ^ "\r\n")
 
     let discon =
       M.return ()
