@@ -109,14 +109,3 @@ let simple1 cmd par = {
     raw_pfx = None;
     raw_cmd = cmd;
     raw_params = [par] }
-
-
-(** error replies **)
-module Errors = struct
-  open Printf
-
-  let _UNKNOWNCOMMAND c nic = simple "421" [nic; c; "Unknown command"]
-  let _NEEDMOREPARAMS c nic = simple "461" [nic; c; "Not enough parameters"]
-  let _ALREADYREGISTERED nic = simple "462" [nic; "You may not register"]
-
-end

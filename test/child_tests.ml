@@ -88,6 +88,10 @@ let quit_test _ = begin
 let err_test_1 _ = begin
     queue_mock [`send "FOO\r\n";
                 `recv (0, ":test.irc 421 * FOO :Unknown command\r\n") ];
+
+    queue_mock [`send "NICK milo\r\n";
+                `send "FOO\r\n";
+                `recv (0, ":test.irc 421 milo FOO :Unknown command\r\n") ];
   end
 
 
