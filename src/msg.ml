@@ -11,6 +11,9 @@ type t = {
     raw_params : string list;
   }
 
+exception Err of t
+
+
 type full =
   (* user operations *)
   | PASS of string
@@ -92,8 +95,28 @@ let with_prefix pfx m =
   { m with raw_pfx = Some pfx }
 
 
-
 let simple cmd pars = {
     raw_pfx = None;
     raw_cmd = cmd;
     raw_params = pars }
+
+let simple0 cmd = {
+    raw_pfx = None;
+    raw_cmd = cmd;
+    raw_params = [] }
+
+let simple1 cmd par = {
+    raw_pfx = None;
+    raw_cmd = cmd;
+    raw_params = [par] }
+
+
+(** error replies **)
+module Errors = struct
+  open Printf
+
+  let _UNKNOWNCOMMAND n c = simple "421" [n; c; "Unknown command"]
+  let _NEEDMOREPARAMS n c = simple "461" [n; c; "Not enough parameters"]
+  let _ALREADYREGISTERED n c = simple "462" [n; c; "You may not register"]
+
+end
