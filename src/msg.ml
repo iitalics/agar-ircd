@@ -5,13 +5,13 @@ type prefix
   = Prefix_server of server_name
   | Prefix_user of nick_name * string option * server_name option
 
-type raw = {
+type t = {
     raw_pfx : prefix option;
     raw_cmd : string;
     raw_params : string list;
   }
 
-type t =
+type full =
   (* user operations *)
   | PASS of string
   | NICK of nick_name

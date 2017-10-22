@@ -4,6 +4,7 @@ module C = CharParser
 open ParserCo.Infix
 
 
+
 (* extra combinators ****************************************)
 
 (** like >>>, but returns the first arg and ignores the result
@@ -19,6 +20,7 @@ let ( <&> ) p1 p2 =
   p1 >>= fun x -> p2 => fun y -> x, y
 
 
+
 (* character patterns ***************************************)
 
 let nospcrlfcl = C.none_of ['\x00'; '\r'; '\n'; ' '; ':']
@@ -29,6 +31,7 @@ let alphanum   = C.letter <|> C.digit
 let special    = P.one_of ['['; ']'; '\\'; '`'; '_'; '^'; '{'; '|'; '}']
 let nickchr    = alphanum <|> special <|> C.char '-'
 let hostchr    = alphanum <|> C.char '.'
+
 
 
 (* parsers **************************************************)
