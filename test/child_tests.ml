@@ -79,14 +79,15 @@ let queue_mock ~queue:q =
 
 
 let quit_test _ = begin
-    queue_mock [`send "QUIT\r\n"; `quit];
+    queue_mock [`send "QUIT\r\n";
+                `recv (0, ":test.irc ERROR :Bye\r\n");
+                `quit ]
   end
 
 
 let err_test_1 _ = begin
-    Irc_common.server_name := "test.irc";
     queue_mock [`send "FOO\r\n";
-                `recv (0, ":test.irc 421 * FOO :Unknown command\r\n")];
+                `recv (0, ":test.irc 421 * FOO :Unknown command\r\n") ];
   end
 
 
