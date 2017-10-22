@@ -1,9 +1,18 @@
 open Batteries
+open Irc_common
+
+type state
+  = Waiting_nick
+  | Waiting_user of nick_name
+  | User of nick_name * user_name * user_mode list * string
 
 module type MONAD = sig
   include Monad.SIG
 
   val con_id : int t
+  val get_s : state t
+  val put_s : state -> unit t
+
   val quit : 'a t
   val send : Routing.target -> string -> unit t
 
@@ -13,7 +22,7 @@ end
 module type FUNC =
   functor(M : MONAD) -> sig
 
-    val init : unit M.t
+    val init : state M.t
     val recv : string -> unit M.t
     val discon : unit M.t
 
@@ -26,32 +35,37 @@ module Make : FUNC =
     open Infix
 
 
-    let init =
-      M.return ()
+    (* utilities *************************)
+
 
     let send_back s =
       M.con_id >>= fun i ->
       M.send (Routing.To_con i) s
 
+
+    (* implementation ********************)
+
+
+    (** initialize the child actor **)
+    let init =
+      M.return Waiting_nick
+
+    (** process a parsed message **)
+    let recv_msg m =
+      if m.Msg.raw_cmd = "QUIT" then
+        M.quit
+      else
+        let m' = Msg.with_prefix (Msg.Prefix_server "irc.node") m in
+        let str =  Msg.to_string m' ^ "\r\n" in
+        send_back str
+
+    (** process just a string input **)
     let recv s =
-      (match CharParser.parse Msg_parse.message s with
-        | Bad _ ->
-           M.return {
-               Msg.raw_pfx = None;
-               Msg.raw_cmd = "421";
-               Msg.raw_params = ["Unknown command"] }
+      match CharParser.parse Msg_parse.message s with
+      | Ok m -> recv_msg m
+      | Bad _ -> M.return ()
 
-        | Ok m ->
-           if m.Msg.raw_cmd = "QUIT" then
-             M.quit
-           else
-             M.return m)
-
-      >>= fun m ->
-      let m' = Msg.with_prefix (Msg.Prefix_server "irc.node") m in
-      send_back (Msg.to_string m' ^ "\r\n")
-
-
+    (** handle the client disconnecting **)
     let discon =
       M.return ()
 

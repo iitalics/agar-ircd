@@ -2,8 +2,8 @@ open Batteries
 open Irc_common
 
 type prefix
-  = Prefix_server of server_name
-  | Prefix_user of nick_name * string option * server_name option
+  = Prefix_server of host_name
+  | Prefix_user of nick_name * user_name option * host_name option
 
 type t = {
     raw_pfx : prefix option;
@@ -15,7 +15,7 @@ type full =
   (* user operations *)
   | PASS of string
   | NICK of nick_name
-  | USER of string * user_mode list * string
+  | USER of user_name * user_mode list * string
   | OPER of string * string
   | MODE of user_mode list * user_mode list
   | SERVICE of unit
@@ -37,29 +37,29 @@ type full =
   | NOTICE of string * string
 
   (* server queries & commands *)
-  | MOTD of server_name option
-  | LUSERS of server_name option
-  | VERSION of server_name option
-  | STATS of server_name option
-  | LINKS of server_name option * mask
-  | TIME of server_name option
+  | MOTD of host_name option
+  | LUSERS of host_name option
+  | VERSION of host_name option
+  | STATS of host_name option
+  | LINKS of host_name option * mask
+  | TIME of host_name option
   | CONNECT of string * int * string option
-  | TRACE of server_name option
-  | ADMIN of server_name option
-  | INFO of server_name option
+  | TRACE of host_name option
+  | ADMIN of host_name option
+  | INFO of host_name option
   | SQUERY of string * string
   | DIE       (* optional *)
   | RESTART   (* optional *)
 
   (* user queries *)
   | WHO of mask * bool
-  | WHOIS of server_name option * mask list
-  | WHOWAS of nick_name list * int option * server_name option
+  | WHOIS of host_name option * mask list
+  | WHOWAS of nick_name list * int option * host_name option
   | KILL of nick_name * string
 
   (* misc *)
-  | PING of server_name * server_name option
-  | PONG of server_name * server_name option
+  | PING of host_name * host_name option
+  | PONG of host_name * host_name option
   | ERROR of string
 
 
