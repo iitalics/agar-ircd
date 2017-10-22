@@ -17,7 +17,7 @@ module Console = struct
 
   let quit () = raise Quit
   let send i s () =
-    Printf.printf "sending to con #%d:\n" i;
+    (if i <> 0 then Printf.printf "sending to con #%d:\n" i);
     print_string s;
     flush IO.stdout
 
