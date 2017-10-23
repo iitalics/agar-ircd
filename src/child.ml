@@ -2,7 +2,8 @@ open Batteries
 open Irc_common
 
 type state
-  = Waiting_nick
+  = Waiting_nick_user
+  | Waiting_nick of user_name * string
   | Waiting_user of nick_name
   | LoggedIn of nick_name
 
@@ -35,14 +36,16 @@ module ERR = struct
 
   let _UNKNOWNCOMMAND c nic = Msg.simple "421" [nic; c; "Unknown command"]
   let _NEEDMOREPARAMS c nic = Msg.simple "461" [nic; c; "Not enough parameters"]
-  let _ALREADYREGISTERED nic = Msg.simple "462" [nic; "You may not register"]
+  let _ALREADYREGISTERED nic = Msg.simple "462" [nic; "You may not reregister"]
   let _ERRONEOUSNICKNAME bad_nic nic = Msg.simple "432" [nic; bad_nic; "Erroneous nickname"]
+  let _NICKCOLLISION nic = Msg.simple "432" [nic; nic; "Nickname collision"]
 
 end
 
 
 module Make : FUNC =
   functor(M : MONAD) -> struct
+    module MonadEx = Monad.Extras(M)
     module Infix = Monad.Infix(M)
     open Infix
 
@@ -62,31 +65,32 @@ module Make : FUNC =
     let bad : ERR.t -> 'a msg_try = fun y ->  M.return (Bad y)
 
 
-    (* utilities *************************)
+    (* utilities ***********************************************)
 
     let send_back s =
       M.con_id >>= fun i ->
       M.send i s
 
-    let my_nick =
+    let my_nick_opt =
       M.get_s =>
         function
-        | Waiting_nick -> "*"
-        | Waiting_user n -> n
-        | LoggedIn n -> n
+        | Waiting_user n -> Some n
+        | LoggedIn n -> Some n
+        | _ -> None
 
     let with_server_prefix m =
       Msg.with_prefix
-        (Msg.Prefix_server(!Irc_common.server_name))
+        (Msg.Prefix_server(!server_name))
         m
 
     let or_default_prefix = function
       | Some pfx -> M.return pfx
       | None ->
-         my_nick =>
-           fun nic ->
-           (* TODO: look up user/host *)
-           Msg.Prefix_user(nic, None, None)
+         (* TODO: look up user/host *)
+         my_nick_opt =>
+           function
+           | None      -> Msg.Prefix_user("*", None, None)
+           | Some nick -> Msg.Prefix_user(nick, None, None)
 
     (** returns Ok(nick) if nick is available,
         or bad(f) if unavailable **)
@@ -100,19 +104,37 @@ module Make : FUNC =
       | p::_ -> ok p
       | [] -> bad (ERR._NEEDMOREPARAMS cmd)
 
-    (* let params_2 cmd = function
-      | p1::p2::_ -> ok (p1, p2)
-      | [] -> bad (ERR._NEEDMOREPARAMS cmd) *)
 
 
-
-    (* implementation ********************)
+    (* implementation ******************************************)
 
     (** initialize the child actor **)
-    let init () = Waiting_nick
+    let init () = Waiting_nick_user
+
+    (** process just a string input **)
+    let rec recv s =
+      match CharParser.parse Msg_parse.message s with
+      | Bad _ -> M.return ()
+      | Ok m ->
+         recv_msg m >>= function
+         | Ok () -> M.return ()
+         | Bad msg_of_nick ->
+            my_nick_opt >>= fun o_nick ->
+            send_back (msg_of_nick (Option.default "*" o_nick)
+                       |> with_server_prefix
+                       |> Msg.to_string)
+
+    (** extract relevant information out of message **)
+    and recv_msg msg =
+      M.get_s >>= fun st ->
+      or_default_prefix msg.Msg.raw_pfx >>= fun prefix ->
+      let cmd = msg.Msg.raw_cmd in
+      let params = msg.Msg.raw_params in
+      process st prefix params cmd
 
     (** process a parsed message **)
-    let process st prefix params = function
+    and process st prefix params = function
+
       | "QUIT" ->
          (* TODO: disconnect if logged in *)
          send_back
@@ -121,39 +143,65 @@ module Make : FUNC =
             |> Msg.to_string)
          >> M.quit
 
+
       | "NICK" ->
          params_1 "NICK" params >>=? fun nick ->
          nick_avail nick >>=? fun nick ->
          (match st with
-          | Waiting_nick ->
-             M.put_s (Waiting_user nick)
-             >> ok_
+          | Waiting_nick_user ->
+             M.put_s (Waiting_user nick) >> ok_
+
+          | Waiting_nick (user, real) ->
+             log_in nick user real
+
           | _ ->
-             bad (ERR._ERRONEOUSNICKNAME nick))
+             bad ERR._NICKCOLLISION)
+
+
+      | "USER" ->
+         (match params with
+          | usr::_::_::realname::_ ->
+             ok (usr, realname)
+          | _ ->
+             bad (ERR._NEEDMOREPARAMS "USER"))
+         >>=? fun (user, real) ->
+         (match st with
+          | Waiting_nick _ ->
+             M.put_s (Waiting_nick (user, real)) >> ok_
+
+          | Waiting_user nick ->
+             log_in nick user real
+
+          | _ ->
+             bad ERR._ALREADYREGISTERED)
+
 
       | cmd ->
          bad (ERR._UNKNOWNCOMMAND cmd)
 
-    (** extract relevant information out of message **)
-    let recv_msg msg =
-      M.get_s >>= fun st ->
-      or_default_prefix msg.Msg.raw_pfx >>= fun prefix ->
-      let cmd = msg.Msg.raw_cmd in
-      let params = msg.Msg.raw_params in
-      process st prefix params cmd
 
-    (** process just a string input **)
-    let recv s =
-      match CharParser.parse Msg_parse.message s with
-      | Bad _ -> M.return ()
-      | Ok m ->
-         recv_msg m >>= function
-         | Ok () -> M.return ()
-         | Bad msg_of_nick ->
-            my_nick >>= fun nic ->
-            send_back (msg_of_nick nic
-                       |> with_server_prefix
-                       |> Msg.to_string)
+    (** log in the user with the given nick & user name **)
+    and log_in nick user real =
+      M.put_s @@ LoggedIn nick
+      >> send_motd ()
+      >> ok_
+
+
+    (** send the MOTD **)
+    and send_motd () =
+      let fmt = Printf.sprintf in
+      [
+        "375", fmt "- %s Message of the day -" !server_name;
+        "372", "- Hello";
+      ]
+      |> MonadEx.m_iter (fun (cmd, str) ->
+             let msg =
+               with_server_prefix
+                 (Msg.simple1 cmd str )
+             in
+             send_back (Msg.to_string msg))
+
+
 
     (** handle the client disconnecting **)
     let discon =

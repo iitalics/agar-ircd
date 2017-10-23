@@ -29,8 +29,7 @@ module Queue_mock = struct
 
   let send con str m =
     match m.queue with
-    | (`recv (i, str'))::q' when con = i
-                                 && str = str' ->
+    | (`recv (i, str'))::q' when con = i && str = str' ->
        m.queue <- q'
 
     | _ -> raise @@ Aborted (`sent (con, str))
@@ -89,19 +88,48 @@ let err_test_1 _ = begin
     queue_mock [`send "FOO\r\n";
                 `recv (0, ":test.irc 421 * FOO :Unknown command\r\n") ];
 
+    let param_count cmd n =
+      let fmt = Printf.sprintf in
+      0 -- (n - 1)
+      |> Enum.iter (fun i ->
+             let args =
+               1 -- i
+               |> Enum.map (const " *")
+               |> Enum.fold (^) ""
+             in
+             queue_mock [`send (fmt "%s%s\r\n" cmd args);
+                         `recv (0, fmt ":test.irc 461 * %s :Not enough parameters\r\n" cmd) ]
+           )
+    in
+
+    param_count "NICK" 1;
+    param_count "USER" 4;
+
     queue_mock [`send "NICK milo\r\n";
                 `send "FOO\r\n";
                 `recv (0, ":test.irc 421 milo FOO :Unknown command\r\n") ];
+  end
 
+let err_test_2 _ = begin
     queue_mock [`send "NICK 123\r\n";
                 `recv (0, ":test.irc 432 * 123 :Erroneous nickname\r\n") ];
   end
 
+let motd_test _ = begin
+
+    queue_mock [`send "NICK milo\r\n";
+                `send "USER milo * * :Milo Turner\r\n";
+                `recv (0, ":test.irc 375 :- test.irc Message of the day -\r\n");
+                `recv (0, ":test.irc 372 :- Hello\r\n") ];
+
+  end
 
 
 let tests =
   "test.child"
-  >::: [
+  >::: List.rev [
       "quit" >:: quit_test;
       "err_1" >:: err_test_1;
+      "err_2" >:: err_test_2;
+      "motd" >:: motd_test;
     ]

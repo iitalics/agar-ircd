@@ -24,9 +24,9 @@ module Extras(M : SIG) = struct
   module I = Infix(M)
   open I
 
-  let rec m_for l f = match l with
+  let rec m_iter f l = match l with
     | [] -> M.return ()
-    | x::xs -> f x >> m_for xs f
+    | x::xs -> f x >> m_iter f xs
 
 end
 

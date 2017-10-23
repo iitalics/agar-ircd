@@ -7,7 +7,7 @@ module Console = struct
   type 'a t = unit -> 'a
   let state = ref None
 
-  let bind m f = f (m ())
+  let bind m f () = f (m ()) ()
   let return = const
   let map = (%)
 
