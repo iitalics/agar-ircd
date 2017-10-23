@@ -10,5 +10,6 @@ let _ =
     [
       Msg_parse_tests.tests;
       Child_tests.tests;
+      DB_tests.tests;
     ]
   |> OU.run_test_tt_main
