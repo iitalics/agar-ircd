@@ -40,6 +40,9 @@ module ERR = struct
   let _ERRONEOUSNICKNAME bad_nic nic = Msg.simple "432" [nic; bad_nic; "Erroneous nickname"]
   let _NICKCOLLISION nic = Msg.simple "432" [nic; nic; "Nickname collision"]
 
+  let _NOSUCHNICK bad_nic nic = Msg.simple "401" [nic; bad_nic; "No such nick/channel"]
+  let _NOSUCHCHANNEL chan nic = Msg.simple "401" [nic; chan; "No such channel"]
+
 end
 
 
@@ -200,6 +203,12 @@ module Make : FUNC =
 
             | _ -> (* TODO: allow nick change while logged in? *)
                bad ERR._NICKCOLLISION);
+
+        (**[  command: PRIVMSG  ]**)
+        define_command "PRIVMSG" ~args:two
+          ~must_be_logged_in:true
+          (fun (target, what) ->
+            bad (ERR._NOSUCHNICK target))
 
       end
 

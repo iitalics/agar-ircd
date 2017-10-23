@@ -112,6 +112,10 @@ let err_test_3 _ = begin
     run_mock
       [`send "NICK @a\r\n"]
       [`recv (0, "432 * @a :Erroneous nickname\r\n") ];
+
+    run_mock
+      [`send "PRIVMSG milo :Hi\r\n"]
+      [`recv (0, "451 * :You have not registered\r\n") ];
   end
 
 let motd_test _ = begin
