@@ -1,11 +1,8 @@
 open Batteries
 open Irc_common
 
-type user_info = user_name
-                 * string (* real name *)
-
 type state
-  = Waiting of user_info option * nick_name option
+  = Waiting of (user_name * string) option * nick_name option
   | Logged_in of nick_name
 
 module type MONAD = sig
@@ -35,8 +32,10 @@ module ERR = struct
 
   type t = nick_name -> Msg.t
 
-  let _UNKNOWNCOMMAND c nic = Msg.simple "421" [nic; c; "Unknown command"]
-  let _NEEDMOREPARAMS c nic = Msg.simple "461" [nic; c; "Not enough parameters"]
+  let _UNKNOWNCOMMAND cmd nic = Msg.simple "421" [nic; cmd; "Unknown command"]
+  let _NEEDMOREPARAMS cmd nic = Msg.simple "461" [nic; cmd; "Not enough parameters"]
+  let _NOTREGISTERED nic = Msg.simple "451" [nic; "You have not registered"]
+
   let _ALREADYREGISTERED nic = Msg.simple "462" [nic; "You may not reregister"]
   let _ERRONEOUSNICKNAME bad_nic nic = Msg.simple "432" [nic; bad_nic; "Erroneous nickname"]
   let _NICKCOLLISION nic = Msg.simple "432" [nic; nic; "Nickname collision"]
@@ -107,11 +106,9 @@ module Make : FUNC =
 
     (* DSL for defining message functionality *)
 
-      let commands : (string,
-                      Msg.prefix
-                      -> string list
-                      -> unit msg_try)
-                       Hashtbl.t
+    let commands : (string,
+                    Msg.prefix -> string list -> unit msg_try)
+                     Hashtbl.t
       = Hashtbl.create 100
 
     let define_command cmd ~args:get_args
@@ -124,7 +121,7 @@ module Make : FUNC =
         | Ok args ->
            if must_login then
              M.get_s >>= function
-             | Waiting _ -> ok_ (* ignore command if not logged in *)
+             | Waiting _ -> bad (ERR._NOTREGISTERED)
              | Logged_in _ -> fn args
            else
              fn args
@@ -184,13 +181,13 @@ module Make : FUNC =
         (**[  command: USER  ]**)
         define_command "USER" ~args:four
           (fun (user, _, _, real) ->
-            M.get_s >>= function
-            | Waiting (None, cur_nick) ->
-               maybe_log_in (Some (user, real)) cur_nick
-               >> ok_
+           M.get_s >>= function
+           | Waiting (None, cur_nick) ->
+              maybe_log_in (Some (user, real)) cur_nick
+              >> ok_
 
-            | _ ->
-               bad ERR._ALREADYREGISTERED);
+           | _ ->
+              bad ERR._ALREADYREGISTERED);
 
         (**[  command: NICK  ]**)
         define_command "NICK" ~args:one
@@ -216,7 +213,7 @@ module Make : FUNC =
     (** process just a string input **)
     let rec recv s =
       match CharParser.parse Msg_parse.message s with
-      | Bad _ -> MonadEx.nop
+      | Bad _ -> MonadEx.nop (* ignore malformed messages *)
       | Ok m ->
          recv_msg m >>= function
          | Ok _ -> MonadEx.nop
