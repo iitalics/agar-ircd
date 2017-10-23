@@ -166,15 +166,15 @@ module Make : FUNC =
              bad (ERR._NEEDMOREPARAMS "USER"))
          >>=? fun (user, real) ->
          (match st with
+          (* set user name & wait for nick name *)
           | Waiting_nick_user ->
              M.put_s (Waiting_nick (user, real)) >> ok_
-
           | Waiting_nick _ ->
              M.put_s (Waiting_nick (user, real)) >> ok_
-
+          (* done w/ log-in sequence *)
           | Waiting_user nick ->
              log_in nick user real
-
+          (* already registered *)
           | _ ->
              bad ERR._ALREADYREGISTERED)
 

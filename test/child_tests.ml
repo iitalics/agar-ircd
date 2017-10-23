@@ -61,11 +61,12 @@ let run_mock actions ~expect:expected =
             if Text.exists txt (Text.of_string substr) then
               assert_bool "ok" true
             else
-              (print_string "\nBEGIN client output:\n";
-               print_string (Text.to_string txt);
-               print_string "\nEND client output\n";
+              (let id = Random.int 100 in
+               Printf.printf "\n[%d] BEGIN client output (con #%d)\n" id i;
+               Printf.printf "%s" (Text.to_string txt);
+               Printf.printf "\n[%d] END client output\n" id;
                assert_bool
-                 (Printf.sprintf "missing substring %S in con #%d" substr i)
+                 (Printf.sprintf "[%d] missing substring %S" id substr)
                  false)
 
          | `final_state s ->
