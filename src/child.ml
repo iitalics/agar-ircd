@@ -1,11 +1,12 @@
 open Batteries
 open Irc_common
 
+type user_info = user_name
+                 * string (* real name *)
+
 type state
-  = Waiting_nick_user
-  | Waiting_nick of user_name * string
-  | Waiting_user of nick_name
-  | LoggedIn of nick_name
+  = Waiting of user_info option * nick_name option
+  | Logged_in of nick_name
 
 module type MONAD = sig
   include Monad.SIG
@@ -50,9 +51,13 @@ module Make : FUNC =
     open Infix
 
 
-    (* results within monads *)
+    (* result-carrying monad *)
 
     type 'a msg_try = ('a, ERR.t) Result.t M.t
+
+    let ok_ : unit msg_try        = M.return (Ok ())
+    let ok : 'a -> 'a msg_try     = fun x -> M.return (Ok x)
+    let bad : ERR.t -> 'a msg_try = fun y ->  M.return (Bad y)
 
     let ( >>=? ) : 'a msg_try -> ('a -> 'b msg_try) -> 'b msg_try =
       fun m f ->
@@ -60,9 +65,6 @@ module Make : FUNC =
       | Ok x -> f x
       | Bad e -> M.return (Bad e)
 
-    let ok_ : unit msg_try        = M.return (Ok ())
-    let ok : 'a -> 'a msg_try     = fun x -> M.return (Ok x)
-    let bad : ERR.t -> 'a msg_try = fun y ->  M.return (Bad y)
 
 
     (* utilities ***********************************************)
@@ -77,9 +79,8 @@ module Make : FUNC =
     let my_nick_opt =
       M.get_s =>
         function
-        | Waiting_user n -> Some n
-        | LoggedIn n -> Some n
-        | _ -> None
+        | Waiting (_, o_nick) -> o_nick
+        | Logged_in n -> Some n
 
     let or_default_prefix = function
       | Some pfx -> M.return pfx
@@ -102,16 +103,115 @@ module Make : FUNC =
       else
         bad (ERR._ERRONEOUSNICKNAME nick)
 
-    let params_1 cmd = function
-      | p::_ -> ok p
-      | [] -> bad (ERR._NEEDMOREPARAMS cmd)
+
+
+    (* DSL for defining message functionality *)
+
+      let commands : (string,
+                      Msg.prefix
+                      -> string list
+                      -> unit msg_try)
+                       Hashtbl.t
+      = Hashtbl.create 100
+
+    let define_command cmd ~args:get_args
+          ?must_be_logged_in:(must_login=false)
+          fn
+      =
+      let handler prefix params =
+        match get_args cmd params with
+        | Bad e -> bad e
+        | Ok args ->
+           if must_login then
+             M.get_s >>= function
+             | Waiting _ -> ok_ (* ignore command if not logged in *)
+             | Logged_in _ -> fn args
+           else
+             fn args
+      in
+      Hashtbl.add commands cmd handler
+
+
+    let none cmd =
+      const (Ok ())
+
+    let one cmd = function
+      | p::_ -> Ok p
+      | _ -> Bad (ERR._NEEDMOREPARAMS cmd)
+
+    let two cmd = function
+      | p::q::_ -> Ok (p, q)
+      | _ -> Bad (ERR._NEEDMOREPARAMS cmd)
+
+    let four cmd = function
+      | p::q::r::s::_ -> Ok (p, q, r, s)
+      | _ -> Bad (ERR._NEEDMOREPARAMS cmd)
+
+
+
+    (* commands ******************************************)
+
+    let _MOTD = [
+        "375", Printf.sprintf "- %s Message of the day -" !server_name;
+        "372", "- Henlo and welcome to my OCaml IRC server.";
+      ]
+
+    (** send the MOTD **)
+    let send_motd () =
+      List.enum _MOTD
+      /@ (fun (cmd, str) -> with_server_prefix (Msg.simple1 cmd str))
+      |> MonadEx.iter send_msg_back
+
+    (** log in if the username and nick name are both set **)
+    let maybe_log_in maybe_user_info maybe_nick =
+      match (maybe_user_info, maybe_nick) with
+      | (Some user_info, Some nick) ->
+         M.put_s (Logged_in nick)
+         >> send_motd ()
+
+      | _ ->
+         M.put_s (Waiting (maybe_user_info, maybe_nick))
+
+
+    let () = begin
+
+        (**[  command: QUIT  ]**)
+        define_command "QUIT" ~args:none
+          (fun () ->
+            send_msg_back (Msg.simple1 "ERROR" "Bye")
+            >> M.quit);
+
+        (**[  command: USER  ]**)
+        define_command "USER" ~args:four
+          (fun (user, _, _, real) ->
+            M.get_s >>= function
+            | Waiting (None, cur_nick) ->
+               maybe_log_in (Some (user, real)) cur_nick
+               >> ok_
+
+            | _ ->
+               bad ERR._ALREADYREGISTERED);
+
+        (**[  command: NICK  ]**)
+        define_command "NICK" ~args:one
+          (fun nick ->
+            M.get_s >>= function
+            | Waiting (cur_user, None) ->
+               nick_avail nick >>=? fun nick' ->
+               maybe_log_in cur_user (Some nick')
+               >> ok_
+
+            | _ -> (* TODO: allow nick change while logged in? *)
+               bad ERR._NICKCOLLISION);
+
+      end
 
 
 
     (* implementation ******************************************)
 
     (** initialize the child actor **)
-    let init () = Waiting_nick_user
+    let init () = Waiting (None, None)
 
     (** process just a string input **)
     let rec recv s =
@@ -119,7 +219,7 @@ module Make : FUNC =
       | Bad _ -> MonadEx.nop
       | Ok m ->
          recv_msg m >>= function
-         | Ok () -> MonadEx.nop
+         | Ok _ -> MonadEx.nop
          | Bad msg_of_nick ->
             my_nick_opt >>= fun o_nick ->
             let nick = Option.default "*" o_nick in
@@ -128,75 +228,13 @@ module Make : FUNC =
 
     (** extract relevant information out of message **)
     and recv_msg msg =
-      M.get_s >>= fun st ->
-      or_default_prefix msg.Msg.raw_pfx >>= fun prefix ->
       let cmd = msg.Msg.raw_cmd in
       let params = msg.Msg.raw_params in
-      process st prefix params cmd
-
-    (** process a parsed message **)
-    and process st prefix params = function
-
-      | "QUIT" ->
-         (* TODO: disconnect if logged in *)
-         send_msg_back (with_server_prefix (Msg.simple1 "ERROR" "Bye"))
-         >> M.quit
-
-
-      | "NICK" ->
-         params_1 "NICK" params >>=? fun arg ->
-         nick_avail arg >>=? fun nick ->
-         (match st with
-          (* set nick name & wait for user name *)
-          | Waiting_nick_user ->
-             M.put_s (Waiting_user nick) >> ok_
-          (* done w/ log-in sequence *)
-          | Waiting_nick (user, real) ->
-             log_in nick user real
-          (* TODO: change nick while connected *)
-          | _ ->
-             bad ERR._NICKCOLLISION)
-
-
-      | "USER" ->
-         (match params with
-          | u::_::_::r::_ ->
-             ok (u, r)
-          | _ ->
-             bad (ERR._NEEDMOREPARAMS "USER"))
-         >>=? fun (user, real) ->
-         (match st with
-          (* set user name & wait for nick name *)
-          | Waiting_nick_user | Waiting_nick _ ->
-             M.put_s (Waiting_nick (user, real)) >> ok_
-          (* done w/ log-in sequence *)
-          | Waiting_user nick ->
-             log_in nick user real
-          (* already registered *)
-          | _ ->
-             bad ERR._ALREADYREGISTERED)
-
-
-      | cmd ->
-         bad (ERR._UNKNOWNCOMMAND cmd)
-
-
-    (** log in the user with the given nick & user name **)
-    and log_in nick user real =
-      M.put_s (LoggedIn nick)
-      >> (M.con_id >>= send_motd)
-      >> ok_
-
-
-    (** send the MOTD **)
-    and send_motd targ =
-      let fmt = Printf.sprintf in
-      List.enum [
-        "375", fmt "- %s Message of the day -" !server_name;
-        "372", "- Henlo and welcome to muh OCaml IRC server.";
-      ]
-      /@ (fun (cmd, str) -> with_server_prefix (Msg.simple1 cmd str))
-      |> MonadEx.iter (fun m -> M.send targ (Msg.to_string m))
+      or_default_prefix msg.Msg.raw_pfx >>= fun prefix ->
+      try
+        Hashtbl.find commands cmd prefix params
+      with Not_found ->
+        bad (ERR._UNKNOWNCOMMAND cmd)
 
     (** handle the client disconnecting **)
     let discon =
