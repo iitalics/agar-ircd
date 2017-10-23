@@ -4,14 +4,18 @@ open Batteries
 module Console = struct
   exception Quit
 
+  module DB = Database.Hash_DB
+
   type 'a t = unit -> 'a
   let state = ref None
+  let user_db = DB.create_user_db ()
 
   let bind m f () = f (m ()) ()
   let return = const
   let map = (%)
 
   let con_id () = 0
+  let users () = user_db
   let get_s () = Ref.oget_exn state
   let put_s s () = state := Some s
 

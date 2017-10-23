@@ -8,7 +8,10 @@ type state
 module type MONAD = sig
   include Monad.SIG
 
+  module DB : Database.SIG
+
   val con_id : int t
+  val users : DB.user_db t
   val get_s : state t
   val put_s : state -> unit t
 

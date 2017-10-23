@@ -4,18 +4,23 @@ open OUnit2
 module Mock = struct
   exception PrematureQuit
 
+  module DB = Database.Hash_DB
+
   type logger = {
       mutable state : Child.state;
+      users : DB.user_db;
       outputs : (int, Text.t) Hashtbl.t;
     }
 
   module Monad = struct
+    module DB = DB
     type 'a t = logger -> 'a
     let return = const
     let bind f g lo = g (f lo) lo
     let map g f lo = g (f lo)
 
-    let con_id _ = 0
+    let con_id lo = 0
+    let users lo = lo.users
     let get_s lo = lo.state
     let put_s s lo = lo.state <- s
 
@@ -29,14 +34,16 @@ module Mock = struct
 end
 
 
+module M = Mock.Monad
+module H = Child.Make(M)
+
 (** run mock with presupplied queue **)
 let run_mock actions ~expect:expected =
-  let module M = Mock.Monad in
-  let module H = Child.Make(M) in
   (* init *)
   let outputs = Hashtbl.create 30 in
   let lo = {
       Mock.state = H.init ();
+      Mock.users = Mock.DB.create_user_db ();
       Mock.outputs = outputs }
   in
 
@@ -47,7 +54,14 @@ let run_mock actions ~expect:expected =
      |> List.iter (fun a ->
             remaining := !remaining - 1;
             match a with
-            | `send s -> H.recv s lo)
+            | `send s ->
+               H.recv s lo
+
+            | `add_user (con, nick, nfo) ->
+               Mock.DB.add_user nick con nfo
+                 (lo.Mock.users)
+
+          )
    with
      Mock.PrematureQuit ->
       if !remaining > 0 then
@@ -72,6 +86,18 @@ let run_mock actions ~expect:expected =
          | `final_state s ->
             assert_bool "final state not expected"
               (s = lo.Mock.state)
+
+         | `user_exists nick ->
+            assert_bool (Printf.sprintf "user %S does not exist" nick)
+              (Option.is_some
+                 (Mock.DB.user_route nick lo.Mock.users))
+
+         | `user_route (nick, route) ->
+            assert_equal
+              ~msg:(Printf.sprintf "user %S does not exist / route is not %d" nick route)
+              (Some route)
+              (Mock.DB.user_route nick lo.Mock.users)
+
        )
 
 
