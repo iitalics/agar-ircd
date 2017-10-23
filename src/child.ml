@@ -166,6 +166,9 @@ module Make : FUNC =
              bad (ERR._NEEDMOREPARAMS "USER"))
          >>=? fun (user, real) ->
          (match st with
+          | Waiting_nick_user ->
+             M.put_s (Waiting_nick (user, real)) >> ok_
+
           | Waiting_nick _ ->
              M.put_s (Waiting_nick (user, real)) >> ok_
 

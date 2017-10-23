@@ -121,6 +121,13 @@ let motd_test _ = begin
        `recv (0, "372 :- Hello\r\n");
        `final_state (Child.LoggedIn "milo")];
 
+    run_mock
+      [`send "USER milo * * :Milo Turner\r\n";
+       `send "NICK milo\r\n"]
+      [`recv (0, "375 :- test.irc Message of the day -\r\n");
+       `recv (0, "372 :- Hello\r\n");
+       `final_state (Child.LoggedIn "milo")];
+
   end
 
 
