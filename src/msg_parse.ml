@@ -45,6 +45,13 @@ let nickname =
     (~* nickchr)
   => String.of_list
 
+let nickname_is_valid s =
+  C.parse
+    ((C.letter <|> special) >>> P.ignore_zero_plus nickchr)
+    s
+  |> Result.is_ok
+
+
 let username =
   (~+ nospcrlfat)
   => String.of_list

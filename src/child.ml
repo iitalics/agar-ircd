@@ -31,6 +31,8 @@ module type FUNC =
 
 module ERR = struct
 
+  type t = nick_name -> Msg.t
+
   let _UNKNOWNCOMMAND c nic = Msg.simple "421" [nic; c; "Unknown command"]
   let _NEEDMOREPARAMS c nic = Msg.simple "461" [nic; c; "Not enough parameters"]
   let _ALREADYREGISTERED nic = Msg.simple "462" [nic; "You may not register"]
@@ -43,6 +45,21 @@ module Make : FUNC =
   functor(M : MONAD) -> struct
     module Infix = Monad.Infix(M)
     open Infix
+
+
+    (* results within monads *)
+
+    type 'a msg_try = ('a, ERR.t) Result.t M.t
+
+    let ( >>=? ) : 'a msg_try -> ('a -> 'b msg_try) -> 'b msg_try =
+      fun m f ->
+      m >>= function
+      | Ok x -> f x
+      | Bad e -> M.return (Bad e)
+
+    let ok_ : unit msg_try        = M.return (Ok ())
+    let ok : 'a -> 'a msg_try     = fun x -> M.return (Ok x)
+    let bad : ERR.t -> 'a msg_try = fun y ->  M.return (Bad y)
 
 
     (* utilities *************************)
@@ -71,21 +88,21 @@ module Make : FUNC =
            (* TODO: look up user/host *)
            Msg.Prefix_user(nic, None, None)
 
-
-    (* results within monads *)
-
-    let ( >>=? ) mr f =
-      mr >>= function
-      | Ok x -> f x
-      | Bad e -> M.return (Bad e)
-
-    let ok_ = M.return (Ok ())
-    let ok x = M.return (Ok x)
-    let bad y = M.return (Bad y)
+    (** returns Ok(nick) if nick is available,
+        or bad(f) if unavailable **)
+    let nick_avail nick =
+      if Msg_parse.nickname_is_valid nick then
+        ok nick
+      else
+        bad (ERR._ERRONEOUSNICKNAME nick)
 
     let params_1 cmd = function
       | p::_ -> ok p
       | [] -> bad (ERR._NEEDMOREPARAMS cmd)
+
+    (* let params_2 cmd = function
+      | p1::p2::_ -> ok (p1, p2)
+      | [] -> bad (ERR._NEEDMOREPARAMS cmd) *)
 
 
 
@@ -105,13 +122,14 @@ module Make : FUNC =
          >> M.quit
 
       | "NICK" ->
-         params_1 "NICK" params >>=? fun new_nick ->
+         params_1 "NICK" params >>=? fun nick ->
+         nick_avail nick >>=? fun nick ->
          (match st with
           | Waiting_nick ->
-             M.put_s (Waiting_user new_nick)
+             M.put_s (Waiting_user nick)
              >> ok_
           | _ ->
-             bad (ERR._ERRONEOUSNICKNAME new_nick))
+             bad (ERR._ERRONEOUSNICKNAME nick))
 
       | cmd ->
          bad (ERR._UNKNOWNCOMMAND cmd)

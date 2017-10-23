@@ -92,6 +92,9 @@ let err_test_1 _ = begin
     queue_mock [`send "NICK milo\r\n";
                 `send "FOO\r\n";
                 `recv (0, ":test.irc 421 milo FOO :Unknown command\r\n") ];
+
+    queue_mock [`send "NICK 123\r\n";
+                `recv (0, ":test.irc 432 * 123 :Erroneous nickname\r\n") ];
   end
 
 
