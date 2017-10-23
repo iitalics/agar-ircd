@@ -145,31 +145,30 @@ module Make : FUNC =
 
 
       | "NICK" ->
-         params_1 "NICK" params >>=? fun nick ->
-         nick_avail nick >>=? fun nick ->
+         params_1 "NICK" params >>=? fun arg ->
+         nick_avail arg >>=? fun nick ->
          (match st with
+          (* set nick name & wait for user name *)
           | Waiting_nick_user ->
              M.put_s (Waiting_user nick) >> ok_
-
+          (* done w/ log-in sequence *)
           | Waiting_nick (user, real) ->
              log_in nick user real
-
+          (* TODO: change nick while connected *)
           | _ ->
              bad ERR._NICKCOLLISION)
 
 
       | "USER" ->
          (match params with
-          | usr::_::_::realname::_ ->
-             ok (usr, realname)
+          | u::_::_::r::_ ->
+             ok (u, r)
           | _ ->
              bad (ERR._NEEDMOREPARAMS "USER"))
          >>=? fun (user, real) ->
          (match st with
           (* set user name & wait for nick name *)
-          | Waiting_nick_user ->
-             M.put_s (Waiting_nick (user, real)) >> ok_
-          | Waiting_nick _ ->
+          | Waiting_nick_user | Waiting_nick _ ->
              M.put_s (Waiting_nick (user, real)) >> ok_
           (* done w/ log-in sequence *)
           | Waiting_user nick ->
@@ -185,7 +184,7 @@ module Make : FUNC =
 
     (** log in the user with the given nick & user name **)
     and log_in nick user real =
-      M.put_s @@ LoggedIn nick
+      M.put_s (LoggedIn nick)
       >> send_motd ()
       >> ok_
 
@@ -195,7 +194,7 @@ module Make : FUNC =
       let fmt = Printf.sprintf in
       [
         "375", fmt "- %s Message of the day -" !server_name;
-        "372", "- Hello";
+        "372", "- Henlo and welcome to muh OCaml IRC server.";
       ]
       |> MonadEx.m_iter (fun (cmd, str) ->
              let msg =
