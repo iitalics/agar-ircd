@@ -67,9 +67,12 @@ module Make : FUNC =
 
     (* utilities ***********************************************)
 
-    let send_back s =
-      M.con_id >>= fun i ->
-      M.send i s
+    let send_msg c msg =
+      M.send c (Msg.to_string msg)
+
+    let send_msg_back msg =
+      M.con_id >>= fun c ->
+      M.send c (Msg.to_string msg)
 
     let my_nick_opt =
       M.get_s =>
@@ -77,11 +80,6 @@ module Make : FUNC =
         | Waiting_user n -> Some n
         | LoggedIn n -> Some n
         | _ -> None
-
-    let with_server_prefix m =
-      Msg.with_prefix
-        (Msg.Prefix_server(!server_name))
-        m
 
     let or_default_prefix = function
       | Some pfx -> M.return pfx
@@ -91,6 +89,10 @@ module Make : FUNC =
            function
            | None      -> Msg.Prefix_user("*", None, None)
            | Some nick -> Msg.Prefix_user(nick, None, None)
+
+    let with_server_prefix =
+      Msg.with_prefix
+        (Msg.Prefix_server !server_name)
 
     (** returns Ok(nick) if nick is available,
         or bad(f) if unavailable **)
@@ -114,15 +116,15 @@ module Make : FUNC =
     (** process just a string input **)
     let rec recv s =
       match CharParser.parse Msg_parse.message s with
-      | Bad _ -> M.return ()
+      | Bad _ -> MonadEx.nop
       | Ok m ->
          recv_msg m >>= function
-         | Ok () -> M.return ()
+         | Ok () -> MonadEx.nop
          | Bad msg_of_nick ->
             my_nick_opt >>= fun o_nick ->
-            send_back (msg_of_nick (Option.default "*" o_nick)
-                       |> with_server_prefix
-                       |> Msg.to_string)
+            let nick = Option.default "*" o_nick in
+            let msg = with_server_prefix (msg_of_nick nick) in
+            send_msg_back msg
 
     (** extract relevant information out of message **)
     and recv_msg msg =
@@ -137,10 +139,7 @@ module Make : FUNC =
 
       | "QUIT" ->
          (* TODO: disconnect if logged in *)
-         send_back
-           (Msg.simple1 "ERROR" "Bye"
-            |> with_server_prefix
-            |> Msg.to_string)
+         send_msg_back (with_server_prefix (Msg.simple1 "ERROR" "Bye"))
          >> M.quit
 
 
@@ -185,28 +184,22 @@ module Make : FUNC =
     (** log in the user with the given nick & user name **)
     and log_in nick user real =
       M.put_s (LoggedIn nick)
-      >> send_motd ()
+      >> (M.con_id >>= send_motd)
       >> ok_
 
 
     (** send the MOTD **)
-    and send_motd () =
+    and send_motd targ =
       let fmt = Printf.sprintf in
-      [
+      List.enum [
         "375", fmt "- %s Message of the day -" !server_name;
         "372", "- Henlo and welcome to muh OCaml IRC server.";
       ]
-      |> MonadEx.m_iter (fun (cmd, str) ->
-             let msg =
-               with_server_prefix
-                 (Msg.simple1 cmd str )
-             in
-             send_back (Msg.to_string msg))
-
-
+      /@ (fun (cmd, str) -> with_server_prefix (Msg.simple1 cmd str))
+      |> MonadEx.iter (fun m -> M.send targ (Msg.to_string m))
 
     (** handle the client disconnecting **)
     let discon =
-      M.return ()
+      MonadEx.nop
 
   end

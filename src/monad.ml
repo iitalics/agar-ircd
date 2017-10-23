@@ -24,9 +24,10 @@ module Extras(M : SIG) = struct
   module I = Infix(M)
   open I
 
-  let rec m_iter f l = match l with
-    | [] -> M.return ()
-    | x::xs -> f x >> m_iter f xs
+  let nop = M.return ()
+
+  let rec iter f =
+    Enum.fold (fun x y -> x >> (f y)) nop
 
 end
 

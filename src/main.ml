@@ -33,9 +33,6 @@ let _ =
   C.state := Some (H.init ());
   try
     while true do
-      print_string "> ";
-      flush IO.stdout;
-
       let line = read_line () ^ "\r\n" in
       C.run (H.recv line)
     done
