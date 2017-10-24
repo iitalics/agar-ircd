@@ -52,12 +52,24 @@ module Tests_for(DB : Database.SIG) = struct
       assert_equal (DB.user_route "ema" db) None;
     end
 
+  let test5 _ =
+    let db = DB.create_user_db () in
+    begin
+      DB.add_user "milo" 4 None db;
+      assert_equal (DB.user_exists "milo" db) true;
+      assert_equal (DB.del_user "milo" db) true;
+      assert_equal (DB.user_exists "milo" db) false;
+      assert_equal (DB.del_user "milo" db) false;
+    end
+
+
   let test_list =
     [
       "test1" >:: test1;
       "test2" >:: test2;
       "test3" >:: test3;
       "test4" >:: test4;
+      "test4" >:: test5;
     ]
 end
 

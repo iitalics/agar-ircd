@@ -65,7 +65,9 @@ let run_mock actions ~expect:expected =
    with
      Mock.PrematureQuit ->
       if !remaining > 0 then
-        assert_failure "unexpected premature quit");
+        assert_failure "unexpected premature quit"
+      else
+        H.discon lo);
 
   (* check for expected substrings *)
   expected
@@ -90,14 +92,18 @@ let run_mock actions ~expect:expected =
 
          | `user_exists nick ->
             assert_bool (Printf.sprintf "user %S does not exist" nick)
-              (Option.is_some
-                 (Mock.DB.user_route nick lo.Mock.users))
+              (Mock.DB.user_exists nick lo.Mock.users)
 
          | `user_route (nick, route) ->
             assert_equal
               ~msg:(Printf.sprintf "user %S does not exist / route is not %d" nick route)
               (Some route)
               (Mock.DB.user_route nick lo.Mock.users)
+
+         | `no_user nick ->
+            assert_bool (Printf.sprintf "user %S exists" nick)
+              (not (Mock.DB.user_exists nick lo.Mock.users))
+
 
        )
 
@@ -108,8 +114,13 @@ let quit_test _ = begin
     run_mock
       [`send "QUIT\r\n"]
       [`recv (0, "ERROR :Bye\r\n")];
-  end
 
+    run_mock
+      [`send "NICK milo\r\n";
+       `send "USER me * * :Name\r\n";
+       `send "QUIT\r\n"]
+      [`no_user "milo"]
+  end
 
 let err_test_1 _ = begin
     run_mock

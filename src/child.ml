@@ -263,6 +263,12 @@ module Make : FUNC =
 
     (** handle the client disconnecting **)
     let discon =
-      MonadEx.nop
+      my_nick_opt >>= function
+      | Some nick ->
+         M.on_users (M.DB.del_user ~nick:nick)
+         >> MonadEx.nop
+      | None ->
+         MonadEx.nop
+
 
   end
