@@ -20,7 +20,7 @@ module Mock = struct
     let map g f lo = g (f lo)
 
     let con_id lo = 0
-    let users lo = lo.users
+    let on_users f lo = f lo.users
     let get_s lo = lo.state
     let put_s s lo = lo.state <- s
 

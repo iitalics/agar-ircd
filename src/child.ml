@@ -11,7 +11,7 @@ module type MONAD = sig
   module DB : Database.SIG
 
   val con_id : int t
-  val users : DB.user_db t
+  val on_users : (DB.user_db -> 'a) -> 'a t
   val get_s : state t
   val put_s : state -> unit t
 
