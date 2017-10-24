@@ -19,10 +19,11 @@ module Mock = struct
     let bind f g lo = g (f lo) lo
     let map g f lo = g (f lo)
 
-    let con_id lo = 0
-    let on_users f lo = f lo.users
+    let get_con lo = 0
+    let get_host lo = "mocked.test.client"
     let get_s lo = lo.state
     let put_s s lo = lo.state <- s
+    let on_users f lo = f lo.users
 
     let send i str lo =
       let add_str s = Text.append s (Text.of_string str) in

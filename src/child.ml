@@ -10,12 +10,21 @@ module type MONAD = sig
 
   module DB : Database.SIG
 
-  val con_id : int t
-  val on_users : (DB.user_db -> 'a) -> 'a t
+  (** gets the child's state **)
   val get_s : state t
+  (** sets the child's state **)
   val put_s : state -> unit t
 
+  (** the connection ID of this child's connection **)
+  val get_con : int t
+  (** the hostname string of this child's connection **)
+  val get_host : string t
+
+  (** applies the given function to the users database **)
+  val on_users : (DB.user_db -> 'a) -> 'a t
+  (** sends a string to the given connection ID **)
   val send : int -> string -> unit t
+  (** closes the connection **)
   val quit : 'a t
 
 end
@@ -24,8 +33,11 @@ end
 module type FUNC =
   functor(M : MONAD) -> sig
 
+    (** get a new initial state **)
     val init : unit -> state
+    (** callback when a child recieves a message (CR LF terminated string) **)
     val recv : string -> unit M.t
+    (** callback when the connection is disconnected **)
     val discon : unit M.t
 
   end
@@ -86,7 +98,7 @@ module Make : FUNC =
       M.send c (Msg.to_string msg)
 
     let send_msg_back msg =
-      M.con_id >>= fun c ->
+      M.get_con >>= fun c ->
       M.send c (Msg.to_string msg)
 
     let my_nick_opt =
@@ -178,10 +190,11 @@ module Make : FUNC =
            >> bad (ERR._NICKNAMEINUSE nick)
          else
            (* ok to log in! *)
-           M.con_id >>= fun con ->
+           M.get_con >>= fun con ->
+           M.get_host >>= fun host ->
            let uinfo = {
                Database.user_name = user;
-               Database.host_name = "unknown.host";
+               Database.host_name = host;
                Database.real_name = real;
                Database.nick_name = nick;
                Database.modes = [];

@@ -14,10 +14,11 @@ module Console = struct
   let return = const
   let map = (%)
 
-  let con_id () = 0
-  let on_users f () = f user_db
+  let get_con () = 0
+  let get_host () = "tty.repl"
   let get_s () = Ref.oget_exn state
   let put_s s () = state := Some s
+  let on_users f () = f user_db
 
   let quit () = raise Quit
   let send i s () =
