@@ -17,7 +17,7 @@ main.native:
 	$(OC) $@
 
 test:
-	$(OC) -I test test.native && ./test.native
+	$(OC) -I test test_main.native && ./test_main.native
 
 clean:
 	rm -rf _build main.native

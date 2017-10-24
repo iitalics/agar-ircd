@@ -1,7 +1,7 @@
 open Batteries
 open OUnit2
 
-module DB_tests(DB : Database.SIG) = struct
+module Tests_for(DB : Database.SIG) = struct
 
   let milo_info = {
       Database.user_name = "milo";
@@ -57,7 +57,7 @@ end
 
 
 let tests =
-  let module T1 = DB_tests(Database.Hash_DB) in
+  let module T1 = Tests_for(Database.Hash_DB) in
   test_list
     [
       "test.db.hash" >::: T1.test_list
