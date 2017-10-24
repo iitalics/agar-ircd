@@ -103,11 +103,7 @@ let run_mock actions ~expect:expected =
          | `no_user nick ->
             assert_bool (Printf.sprintf "user %S exists" nick)
               (not (Mock.DB.user_exists nick lo.Mock.users))
-
-
        )
-
-
 
 
 let quit_test _ = begin
