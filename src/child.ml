@@ -64,6 +64,7 @@ end
 
 module Make : FUNC =
   functor(M : MONAD) -> struct
+    module DB = M.DB
     module MonadEx = Monad.Extras(M)
     module Infix = Monad.Infix(M)
     open Infix
@@ -119,7 +120,7 @@ module Make : FUNC =
       | None ->
          M.return (Msg.Prefix_user ("*", None, Some host))
       | Some nick ->
-         M.on_users (M.DB.user_info ~nick:nick) >>= fun maybe_info ->
+         M.on_users (DB.user_info ~nick:nick) >>= fun maybe_info ->
          let maybe_user =
            Option.map (fun i -> i.Database.user_name)
              maybe_info
@@ -191,9 +192,9 @@ module Make : FUNC =
     (** log in if the username and nick name are both set,
         and nick is not in use. otherwise, set state to Waiting **)
     let try_log_in maybe_user_info maybe_nick =
-      match (maybe_user_info, maybe_nick) with
-      | (Some (user, real), Some nick) ->
-         M.on_users (M.DB.user_exists ~nick:nick) >>= fun exists ->
+      match maybe_user_info, maybe_nick with
+      | Some (user, real), Some nick ->
+         M.on_users (DB.user_exists ~nick:nick) >>= fun exists ->
          if exists then
            (* nick name in use *)
            M.put_s (Waiting (maybe_user_info, None))
@@ -207,10 +208,9 @@ module Make : FUNC =
                Database.host_name = host;
                Database.real_name = real;
                Database.nick_name = nick;
-               Database.modes = [];
-             }
+               Database.modes = [] }
            in
-           M.on_users (M.DB.add_user ~nick:nick con (Some uinfo))
+           M.on_users (DB.add_user ~nick:nick con (Some uinfo))
            >> M.put_s (Logged_in nick)
            >> send_motd con
            >> ok_
@@ -263,7 +263,7 @@ module Make : FUNC =
             String.split_on_char ',' who
             |> try_map_list (fun name ->
                    (* TODO: send to channels if name begins with # *)
-                   M.on_users (M.DB.user_route ~nick:name) >>= function
+                   M.on_users (DB.user_route ~nick:name) >>= function
                    | Some con ->
                       ok (con, name)
                    | None ->
@@ -278,7 +278,7 @@ module Make : FUNC =
                       send_msg con
                         (Msg.with_prefix prefix
                            (Msg.simple "PRIVMSG" [name; what])))
-               >>= ok)
+               >>= ok);
 
       end
 
@@ -316,10 +316,9 @@ module Make : FUNC =
     let discon =
       get_nick_opt >>= function
       | Some nick ->
-         M.on_users (M.DB.del_user ~nick:nick)
+         M.on_users (DB.del_user ~nick:nick)
          >> MonadEx.nop
       | None ->
          MonadEx.nop
-
 
   end

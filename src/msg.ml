@@ -12,7 +12,11 @@ type t = {
   }
 
 
-(** convert a message back into a string **)
+(** convert a message back into a string
+    this uses ^ alot, so it's probably not
+    very efficient even though it needs to be ...
+    this will get a rewrite once we begin to have
+    more functionality *)
 let to_string m =
   let open Printf in
   let prefix_str =
@@ -41,18 +45,19 @@ let with_prefix pfx m =
   { m with raw_pfx = Some pfx }
 
 
-(* simple message constructors *)
-
+(* construct a message without a prefix *)
 let simple cmd pars = {
     raw_pfx = None;
     raw_cmd = cmd;
     raw_params = pars }
 
+(** construct message without prefix or parameters **)
 let simple0 cmd = {
     raw_pfx = None;
     raw_cmd = cmd;
     raw_params = [] }
 
+(** construct message with just a single parameter **)
 let simple1 cmd par = {
     raw_pfx = None;
     raw_cmd = cmd;
