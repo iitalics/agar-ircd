@@ -71,6 +71,13 @@ module Make : FUNC =
       | Ok x -> f x
       | Bad e -> M.return (Bad e)
 
+    let rec try_map_list f = function
+      | [] -> ok []
+      | x::xs ->
+         f x >>=? fun y ->
+         try_map_list f xs >>=? fun ys ->
+         ok (y::ys)
+
 
 
     (* utilities ***********************************************)
@@ -147,8 +154,9 @@ module Make : FUNC =
 
     (* commands ******************************************)
 
-    let _MOTD = [
-        "375", Printf.sprintf "- %s Message of the day -" !server_name;
+    let _MOTD srv_name =
+      [
+        "375", Printf.sprintf "- %s Message of the day -" srv_name;
         "372", "- Henlo and welcome to my OCaml IRC server.";
       ]
 
@@ -227,8 +235,27 @@ module Make : FUNC =
         (**[  command: PRIVMSG  ]**)
         define_command "PRIVMSG" ~args:two
           ~must_be_logged_in:true
-          (fun (target, what) ->
-            bad (ERR._NOSUCHNICK target))
+          (fun prefix (who, what) ->
+            (* convert target names into routes *)
+            String.split_on_char ',' who
+            |> try_map_list (fun name ->
+                   (* TODO: send to channels if name begins with # *)
+                   M.on_users (M.DB.user_route ~nick:name) >>= function
+                   | Some con ->
+                      ok (con, name)
+                   | None ->
+                      bad (ERR._NOSUCHNICK name))
+
+            >>= function
+            | Bad b -> bad b
+            | Ok targs ->
+               (* send to all recipients *)
+               List.enum targs
+               |> MonadEx.iter (fun (con, name) ->
+                      send_msg con
+                        (Msg.with_prefix prefix
+                           (Msg.simple "PRIVMSG" [name; what])))
+               >>= ok)
 
       end
 

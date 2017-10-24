@@ -153,7 +153,7 @@ let err_test_3 _ = begin
       [`recv (0, "451 * :You have not registered\r\n") ];
   end
 
-let nick_test_1 _ = begin
+let nick_test _ = begin
     run_mock
       [`send "NICK milo\r\n";
        `send "USER me * * :Name\r\n"]
@@ -183,6 +183,15 @@ let motd_test _ = begin
        `final_state (Child.Logged_in "milo")];
   end
 
+let privmsg_test _ = begin
+    run_mock
+      [`add_user (99, "joe", None);
+       `send "NICK milo\r\n";
+       `send "USER milo * * :\r\n";
+       `send "PRIVMSG joe :Hi\r\n"]
+      [`recv (99, "PRIVMSG joe :Hi\r\n")]
+  end
+
 
 let tests =
   "test.child"
@@ -191,6 +200,7 @@ let tests =
       "err_1_unknown_cmd" >:: err_test_1;
       "err_2_param_count" >:: err_test_2;
       "err_3" >:: err_test_3;
-      "nick_test_1" >:: nick_test_1;
+      "nick_test" >:: nick_test;
+      "privmsg_test" >:: privmsg_test;
       "motd" >:: motd_test;
     ]
