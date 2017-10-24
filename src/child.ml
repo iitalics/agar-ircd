@@ -41,6 +41,7 @@ module ERR = struct
 
   let _ALREADYREGISTERED nic = Msg.simple "462" [nic; "You may not reregister"]
   let _ERRONEOUSNICKNAME bad_nic nic = Msg.simple "432" [nic; bad_nic; "Erroneous nickname"]
+  let _NICKNAMEINUSE bad_nic nic = Msg.simple "433" [nic; bad_nic; "Nickname is already in use"]
   let _NICKCOLLISION nic = Msg.simple "432" [nic; nic; "Nickname collision"]
 
   let _NOSUCHNICK bad_nic nic = Msg.simple "401" [nic; bad_nic; "No such nick/channel"]
@@ -100,24 +101,16 @@ module Make : FUNC =
       Msg.with_prefix
         (Msg.Prefix_server !server_name)
 
-    (** returns Ok(nick) if nick is available,
-        or bad(f) if unavailable **)
-    let nick_avail nick =
-      if Msg_parse.nickname_is_valid nick then
-        ok nick
-      else
-        bad (ERR._ERRONEOUSNICKNAME nick)
-
 
 
     (* DSL for defining message functionality *)
 
-    let commands : (string,
-                    Msg.prefix -> string list -> unit msg_try)
+    let commands : (string, Msg.prefix -> string list -> unit msg_try)
                      Hashtbl.t
       = Hashtbl.create 100
 
-    let define_command cmd ~args:get_args
+    let define_command cmd
+          ~args:get_args
           ?must_be_logged_in:(must_login=false)
           fn
       =
@@ -160,20 +153,43 @@ module Make : FUNC =
       ]
 
     (** send the MOTD **)
-    let send_motd () =
+    let send_motd targ =
       List.enum _MOTD
       /@ (fun (cmd, str) -> with_server_prefix (Msg.simple1 cmd str))
-      |> MonadEx.iter send_msg_back
+      |> MonadEx.iter (send_msg targ)
 
-    (** log in if the username and nick name are both set **)
-    let maybe_log_in maybe_user_info maybe_nick =
+    (** log in if the username and nick name are both set,
+        and nick is not in use. otherwise, set state to Waiting **)
+    let try_log_in maybe_user_info maybe_nick =
       match (maybe_user_info, maybe_nick) with
-      | (Some user_info, Some nick) ->
-         M.put_s (Logged_in nick)
-         >> send_motd ()
+      | (Some (user, real), Some nick) ->
+         M.on_users (M.DB.user_exists ~nick:nick) >>= fun exists ->
+         if exists then
+           (* nick name in use *)
+           M.put_s (Waiting (maybe_user_info, None))
+           >> bad (ERR._NICKNAMEINUSE nick)
+         else
+           (* ok to log in! *)
+           M.con_id >>= fun con ->
+           let uinfo = {
+               Database.user_name = user;
+               Database.host_name = "unknown.host";
+               Database.real_name = real;
+               Database.nick_name = nick;
+               Database.modes = [];
+             }
+           in
+           M.on_users (M.DB.add_user ~nick:nick con (Some uinfo))
+           >> M.put_s (Logged_in nick)
+           >> send_motd con
+           >> ok_
+
+      (* TODO LATER: we have to fucking synchronize
+         nickname access across the entire network ???? *)
 
       | _ ->
          M.put_s (Waiting (maybe_user_info, maybe_nick))
+         >> ok_
 
 
     let () = begin
@@ -189,8 +205,7 @@ module Make : FUNC =
           (fun (user, _, _, real) ->
            M.get_s >>= function
            | Waiting (None, cur_nick) ->
-              maybe_log_in (Some (user, real)) cur_nick
-              >> ok_
+              try_log_in (Some (user, real)) cur_nick
 
            | _ ->
               bad ERR._ALREADYREGISTERED);
@@ -198,14 +213,15 @@ module Make : FUNC =
         (**[  command: NICK  ]**)
         define_command "NICK" ~args:one
           (fun nick ->
-            M.get_s >>= function
-            | Waiting (cur_user, None) ->
-               nick_avail nick >>=? fun nick' ->
-               maybe_log_in cur_user (Some nick')
-               >> ok_
+            if not (Msg_parse.nickname_is_valid nick) then
+              bad (ERR._ERRONEOUSNICKNAME nick)
+            else
+              M.get_s >>= function
+              | Waiting (cur_user, None) ->
+                 try_log_in cur_user (Some nick)
 
-            | _ -> (* TODO: allow nick change while logged in? *)
-               bad ERR._NICKCOLLISION);
+              | _ -> (* TODO: allow nick change while logged in? *)
+                 bad ERR._NICKCOLLISION);
 
         (**[  command: PRIVMSG  ]**)
         define_command "PRIVMSG" ~args:two

@@ -75,6 +75,7 @@ let run_mock actions ~expect:expected =
             if Text.exists txt (Text.of_string substr) then
               assert_bool "ok" true
             else
+              (* dumb the output text if not found *)
               (let id = Random.int 100 in
                Printf.printf "\n[%d] BEGIN client output (con #%d)\n" id i;
                Printf.printf "%s" (Text.to_string txt);
@@ -104,8 +105,9 @@ let run_mock actions ~expect:expected =
 
 
 let quit_test _ = begin
-    run_mock [`send "QUIT\r\n"]
-      ~expect:[`recv (0, "ERROR :Bye\r\n")];
+    run_mock
+      [`send "QUIT\r\n"]
+      [`recv (0, "ERROR :Bye\r\n")];
   end
 
 
@@ -144,6 +146,20 @@ let err_test_3 _ = begin
       [`recv (0, "451 * :You have not registered\r\n") ];
   end
 
+let nick_test_1 _ = begin
+    run_mock
+      [`send "NICK milo\r\n";
+       `send "USER me * * :Name\r\n"]
+      [`user_route ("milo", 0)];
+
+    run_mock
+      [`add_user (3, "milo", None);
+       `send "NICK milo\r\n";
+       `send "USER me * * :Milo\r\n"]
+      [`recv (0, "433 * milo :Nickname is already in use\r\n");
+       `user_route ("milo", 3) ]
+  end
+
 let motd_test _ = begin
     run_mock
       [`send "NICK milo\r\n";
@@ -158,7 +174,6 @@ let motd_test _ = begin
       [`recv (0, "375 :- test.irc Message of the day -\r\n");
        `recv (0, "372 :- ");
        `final_state (Child.Logged_in "milo")];
-
   end
 
 
@@ -169,5 +184,6 @@ let tests =
       "err_1_unknown_cmd" >:: err_test_1;
       "err_2_param_count" >:: err_test_2;
       "err_3" >:: err_test_3;
+      "nick_test_1" >:: nick_test_1;
       "motd" >:: motd_test;
     ]
