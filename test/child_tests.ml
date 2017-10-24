@@ -20,7 +20,7 @@ module Mock = struct
     let map g f lo = g (f lo)
 
     let get_con lo = 0
-    let get_host lo = "mocked.test.client"
+    let get_host lo = "mock.client"
     let get_s lo = lo.state
     let put_s s lo = lo.state <- s
     let on_users f lo = f lo.users
@@ -187,10 +187,10 @@ let motd_test _ = begin
 let privmsg_test _ = begin
     run_mock
       [`add_user (99, "joe", None);
-       `send "NICK milo\r\n";
+       `send "NICK ii\r\n";
        `send "USER milo * * :\r\n";
        `send "PRIVMSG joe :Hi\r\n"]
-      [`recv (99, "PRIVMSG joe :Hi\r\n")]
+      [`recv (99, ":ii!milo@mock.client PRIVMSG joe :Hi\r\n")]
   end
 
 

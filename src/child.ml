@@ -94,6 +94,10 @@ module Make : FUNC =
 
     (* utilities ***********************************************)
 
+    let with_server_prefix =
+      Msg.with_prefix
+        (Msg.Prefix_server !server_name)
+
     let send_msg c msg =
       M.send c (Msg.to_string msg)
 
@@ -101,24 +105,29 @@ module Make : FUNC =
       M.get_con >>= fun c ->
       M.send c (Msg.to_string msg)
 
-    let my_nick_opt =
+    let get_nick_opt =
       M.get_s =>
         function
         | Waiting (_, o_nick) -> o_nick
         | Logged_in n -> Some n
 
+
+    let default_prefix =
+      M.get_host >>= fun host ->
+      get_nick_opt >>= function
+      | None ->
+         M.return (Msg.Prefix_user ("*", None, Some host))
+      | Some nick ->
+         M.on_users (M.DB.user_info ~nick:nick) >>= fun maybe_info ->
+         let maybe_user =
+           Option.map (fun i -> i.Database.user_name)
+             maybe_info
+         in
+         M.return (Msg.Prefix_user (nick, maybe_user, Some host))
+
     let or_default_prefix = function
       | Some pfx -> M.return pfx
-      | None ->
-         (* TODO: look up user/host *)
-         my_nick_opt =>
-           function
-           | None      -> Msg.Prefix_user("*", None, None)
-           | Some nick -> Msg.Prefix_user(nick, None, None)
-
-    let with_server_prefix =
-      Msg.with_prefix
-        (Msg.Prefix_server !server_name)
+      | None -> default_prefix
 
 
 
@@ -287,7 +296,7 @@ module Make : FUNC =
          recv_msg m >>= function
          | Ok _ -> MonadEx.nop
          | Bad msg_of_nick ->
-            my_nick_opt >>= fun o_nick ->
+            get_nick_opt >>= fun o_nick ->
             let nick = Option.default "*" o_nick in
             let msg = with_server_prefix (msg_of_nick nick) in
             send_msg_back msg
@@ -304,7 +313,7 @@ module Make : FUNC =
 
     (** handle the client disconnecting **)
     let discon =
-      my_nick_opt >>= function
+      get_nick_opt >>= function
       | Some nick ->
          M.on_users (M.DB.del_user ~nick:nick)
          >> MonadEx.nop
