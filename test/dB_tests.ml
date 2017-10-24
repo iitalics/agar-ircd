@@ -14,6 +14,7 @@ module Tests_for(DB : Database.SIG) = struct
   let test1 _ =
     let db = DB.create_user_db () in
     begin
+      assert_equal (DB.user_exists "milo" db) false;
       assert_equal (DB.user_route "milo" db) None;
       assert_equal (DB.user_info "milo" db) None;
     end
@@ -22,6 +23,7 @@ module Tests_for(DB : Database.SIG) = struct
     let db = DB.create_user_db () in
     begin
       DB.add_user "milo" 4 None db;
+      assert_equal (DB.user_exists "milo" db) true;
       assert_equal (DB.user_route "milo" db) (Some 4);
       assert_equal (DB.user_info "milo" db) None;
     end
@@ -30,6 +32,7 @@ module Tests_for(DB : Database.SIG) = struct
     let db = DB.create_user_db () in
     begin
       DB.add_user "milo" 4 (Some milo_info) db;
+      assert_equal (DB.user_exists "milo" db) true;
       assert_equal (DB.user_route "milo" db) (Some 4);
       assert_equal (DB.user_info "milo" db) (Some milo_info);
     end
@@ -39,10 +42,13 @@ module Tests_for(DB : Database.SIG) = struct
     begin
       DB.add_user "milo" 4 (Some milo_info) db;
       DB.add_user "ruby" 6 None db;
+      assert_equal (DB.user_exists "milo" db) true;
       assert_equal (DB.user_route "milo" db) (Some 4);
       assert_equal (DB.user_info "milo" db) (Some milo_info);
+      assert_equal (DB.user_exists "milo" db) true;
       assert_equal (DB.user_route "ruby" db) (Some 6);
       assert_equal (DB.user_info "ruby" db) None;
+      assert_equal (DB.user_exists "ema" db) false;
       assert_equal (DB.user_route "ema" db) None;
     end
 
