@@ -59,7 +59,7 @@ module Make : FUNC =
 
     (* result-carrying monad *)
 
-    type 'a msg_try = ('a, ERR.t) Result.t M.t
+    type 'a msg_try = ('a, ERR.t) result M.t
 
     let ok_ : unit msg_try        = M.return (Ok ())
     let ok : 'a -> 'a msg_try     = fun x -> M.return (Ok x)
@@ -121,9 +121,9 @@ module Make : FUNC =
            if must_login then
              M.get_s >>= function
              | Waiting _ -> bad (ERR._NOTREGISTERED)
-             | Logged_in _ -> fn args
+             | Logged_in _ -> fn prefix args
            else
-             fn args
+             fn prefix args
       in
       Hashtbl.add commands cmd handler
 
@@ -154,7 +154,7 @@ module Make : FUNC =
 
     (** send the MOTD **)
     let send_motd targ =
-      List.enum _MOTD
+      List.enum (_MOTD !server_name)
       /@ (fun (cmd, str) -> with_server_prefix (Msg.simple1 cmd str))
       |> MonadEx.iter (send_msg targ)
 
@@ -196,32 +196,33 @@ module Make : FUNC =
 
         (**[  command: QUIT  ]**)
         define_command "QUIT" ~args:none
-          (fun () ->
+          (fun _ () ->
             send_msg_back (Msg.simple1 "ERROR" "Bye")
             >> M.quit);
 
+
         (**[  command: USER  ]**)
         define_command "USER" ~args:four
-          (fun (user, _, _, real) ->
+          (fun _ (user, _, _, real) ->
            M.get_s >>= function
            | Waiting (None, cur_nick) ->
               try_log_in (Some (user, real)) cur_nick
-
            | _ ->
               bad ERR._ALREADYREGISTERED);
 
+
         (**[  command: NICK  ]**)
         define_command "NICK" ~args:one
-          (fun nick ->
+          (fun _ nick ->
             if not (Msg_parse.nickname_is_valid nick) then
               bad (ERR._ERRONEOUSNICKNAME nick)
             else
               M.get_s >>= function
               | Waiting (cur_user, None) ->
                  try_log_in cur_user (Some nick)
-
               | _ -> (* TODO: allow nick change while logged in? *)
                  bad ERR._NICKCOLLISION);
+
 
         (**[  command: PRIVMSG  ]**)
         define_command "PRIVMSG" ~args:two
