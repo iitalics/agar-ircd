@@ -35,6 +35,7 @@ let _ =
   let module C = Console in
   let module H = Child.Make(C) in
 
+  Irc_common.server_name := "cmdline.test.irc";
   C.state := Some (H.init ());
   try
     while true do

@@ -94,9 +94,10 @@ module Make : FUNC =
 
     (* utilities ***********************************************)
 
-    let with_server_prefix =
+    let with_server_prefix msg =
       Msg.with_prefix
         (Msg.Prefix_server !server_name)
+        msg
 
     let send_msg c msg =
       M.send c (Msg.to_string msg)
