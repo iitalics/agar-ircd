@@ -11,60 +11,6 @@ type t = {
     raw_params : string list;
   }
 
-exception Err of t
-
-
-type full =
-  (* user operations *)
-  | PASS of string
-  | NICK of nick_name
-  | USER of user_name * user_mode list * string
-  | OPER of string * string
-  | MODE of user_mode list * user_mode list
-  | SERVICE of unit
-  | QUIT of string option
-  | SQUIT of string * string
-  | AWAY of string option
-
-  (* channel operations *)
-  | JOIN of (chan_name * string option) list
-  | PART of chan_name list * string option
-  | TOPIC of chan_name * string option
-  | NAMES of chan_name list
-  | LIST of chan_name list
-  | INVITE of nick_name * chan_name
-  | KICK of chan_name list
-
-  (* sending messages *)
-  | PRIVMSG of string * string
-  | NOTICE of string * string
-
-  (* server queries & commands *)
-  | MOTD of host_name option
-  | LUSERS of host_name option
-  | VERSION of host_name option
-  | STATS of host_name option
-  | LINKS of host_name option * mask
-  | TIME of host_name option
-  | CONNECT of string * int * string option
-  | TRACE of host_name option
-  | ADMIN of host_name option
-  | INFO of host_name option
-  | SQUERY of string * string
-  | DIE       (* optional *)
-  | RESTART   (* optional *)
-
-  (* user queries *)
-  | WHO of mask * bool
-  | WHOIS of host_name option * mask list
-  | WHOWAS of nick_name list * int option * host_name option
-  | KILL of nick_name * string
-
-  (* misc *)
-  | PING of host_name * host_name option
-  | PONG of host_name * host_name option
-  | ERROR of string
-
 
 (** convert a message back into a string **)
 let to_string m =
@@ -94,6 +40,8 @@ let to_string m =
 let with_prefix pfx m =
   { m with raw_pfx = Some pfx }
 
+
+(* simple message constructors *)
 
 let simple cmd pars = {
     raw_pfx = None;
