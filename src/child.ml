@@ -54,6 +54,7 @@ module ERR = struct
   let _NOTREGISTERED nic = Msg.simple "451" [nic; "You have not registered"]
 
   let _ALREADYREGISTERED nic = Msg.simple "462" [nic; "You may not reregister"]
+  let _NONICKNAMEGIVEN nic = Msg.simple "431" [nic; "No nickname given"]
   let _ERRONEOUSNICKNAME bad_nic nic = Msg.simple "432" [nic; bad_nic; "Erroneous nickname"]
   let _NICKNAMEINUSE bad_nic nic = Msg.simple "433" [nic; bad_nic; "Nickname is already in use"]
   let _NICKCOLLISION nic = Msg.simple "432" [nic; nic; "Nickname collision"]
@@ -255,7 +256,9 @@ module Make : FUNC =
         (**[  command: NICK  ]**)
         define_command "NICK" ~args:one
           (fun _ nick ->
-            if not (Msg_parse.nickname_is_valid nick) then
+            if String.is_empty nick then
+              bad ERR._NONICKNAMEGIVEN
+            else if not (Msg_parse.nickname_is_valid nick) then
               bad (ERR._ERRONEOUSNICKNAME nick)
             else
               M.get_s >>= function
