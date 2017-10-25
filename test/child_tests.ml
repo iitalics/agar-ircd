@@ -23,6 +23,7 @@ module Mock = struct
     let get_host lo = "mock.client"
     let get_s lo = lo.state
     let put_s s lo = lo.state <- s
+    let mut_users f lo = f lo.users
     let on_users f lo = f lo.users
 
     let send i str lo =

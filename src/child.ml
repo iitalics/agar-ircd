@@ -20,8 +20,10 @@ module type MONAD = sig
   (** the hostname string of this child's connection **)
   val get_host : string t
 
-  (** applies the given function to the users database **)
+  (** applies the given immutable operation to the users database **)
   val on_users : (DB.user_db -> 'a) -> 'a t
+  (** applies the given mutable operation to the users database **)
+  val mut_users : (DB.user_db -> unit) -> unit t
   (** sends a string to the given connection ID **)
   val send : int -> string -> unit t
   (** closes the connection **)
@@ -191,26 +193,26 @@ module Make : FUNC =
 
     (** log in if the username and nick name are both set,
         and nick is not in use. otherwise, set state to Waiting **)
-    let try_log_in maybe_user_info maybe_nick =
-      match maybe_user_info, maybe_nick with
+    let try_log_in maybe_user_real maybe_nick =
+      match maybe_user_real, maybe_nick with
       | Some (user, real), Some nick ->
          M.on_users (DB.user_exists ~nick:nick) >>= fun exists ->
          if exists then
            (* nick name in use *)
-           M.put_s (Waiting (maybe_user_info, None))
+           M.put_s (Waiting (maybe_user_real, None))
            >> bad (ERR._NICKNAMEINUSE nick)
          else
            (* ok to log in! *)
            M.get_con >>= fun con ->
            M.get_host >>= fun host ->
-           let uinfo = {
+           let user_info = {
                Database.user_name = user;
                Database.host_name = host;
                Database.real_name = real;
                Database.nick_name = nick;
                Database.modes = [] }
            in
-           M.on_users (DB.add_user ~nick:nick con (Some uinfo))
+           M.mut_users (DB.add_user ~nick:nick con (Some user_info))
            >> M.put_s (Logged_in nick)
            >> send_motd con
            >> ok_
@@ -219,7 +221,7 @@ module Make : FUNC =
          nickname access across the entire network ???? *)
 
       | _ ->
-         M.put_s (Waiting (maybe_user_info, maybe_nick))
+         M.put_s (Waiting (maybe_user_real, maybe_nick))
          >> ok_
 
 
@@ -275,9 +277,10 @@ module Make : FUNC =
                (* send to all recipients *)
                List.enum targs
                |> MonadEx.iter (fun (con, name) ->
-                      send_msg con
-                        (Msg.with_prefix prefix
-                           (Msg.simple "PRIVMSG" [name; what])))
+                      send_msg con {
+                          Msg.raw_pfx = Some prefix;
+                          Msg.raw_cmd = "PRIVMSG";
+                          Msg.raw_params = [name; what] })
                >>= ok);
 
       end
@@ -316,7 +319,7 @@ module Make : FUNC =
     let discon =
       get_nick_opt >>= function
       | Some nick ->
-         M.on_users (DB.del_user ~nick:nick)
+         M.mut_users (DB.del_user ~nick:nick)
          >> MonadEx.nop
       | None ->
          MonadEx.nop

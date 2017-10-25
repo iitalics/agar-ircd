@@ -22,12 +22,12 @@ module type SIG = sig
   val user_route : nick:string -> user_db -> int option
   val user_info : nick:string -> user_db -> user_info option
   val add_user : nick:string -> int -> user_info option -> user_db -> unit
-  val del_user : nick:string -> user_db -> bool
+  val del_user : nick:string -> user_db -> unit
 
 end
 
 
-module Hash_DB : SIG = struct
+module Hash_DB = struct
 
   type entry = int * user_info option
   type user_db = (string, entry) Hashtbl.t
@@ -48,9 +48,6 @@ module Hash_DB : SIG = struct
     Hashtbl.add db nick (route, nfo)
 
   let del_user ~nick db =
-    if Hashtbl.mem db nick then
-      (Hashtbl.remove_all db nick; true)
-    else
-      false
+    Hashtbl.remove_all db nick
 
 end

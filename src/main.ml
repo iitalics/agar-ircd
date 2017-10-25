@@ -19,6 +19,7 @@ module Console = struct
   let get_s () = Ref.oget_exn state
   let put_s s () = state := Some s
   let on_users f () = f user_db
+  let mut_users f () = f user_db
 
   let quit () = raise Quit
   let send i s () =

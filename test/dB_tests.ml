@@ -57,9 +57,9 @@ module Tests_for(DB : Database.SIG) = struct
     begin
       DB.add_user "milo" 4 None db;
       assert_equal (DB.user_exists "milo" db) true;
-      assert_equal (DB.del_user "milo" db) true;
+      DB.del_user "milo" db;
       assert_equal (DB.user_exists "milo" db) false;
-      assert_equal (DB.del_user "milo" db) false;
+      DB.del_user "milo" db;
     end
 
 
