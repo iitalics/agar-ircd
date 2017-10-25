@@ -15,15 +15,16 @@ module type MONAD = sig
   (** sets the child's state **)
   val put_st : st -> unit t
 
+  (** applies the given immutable operation to the users database **)
+  val on_users : (DB.user_db -> 'a) -> 'a t
+  (** applies the given mutable operation to the users database **)
+  val mut_users : (DB.user_db -> unit) -> unit t
+
   (** the connection ID of this child's connection **)
   val get_con : int t
   (** the hostname string of this child's connection **)
   val get_host : string t
 
-  (** applies the given immutable operation to the users database **)
-  val on_users : (DB.user_db -> 'a) -> 'a t
-  (** applies the given mutable operation to the users database **)
-  val mut_users : (DB.user_db -> unit) -> unit t
   (** sends a string to the given connection ID **)
   val send : int -> string -> unit t
   (** closes the connection **)
@@ -180,7 +181,7 @@ module Make : FUNC =
 
     (* commands ******************************************)
 
-    let _MOTD nick =
+    let motd_list_for nick =
       [
         "001", [Printf.sprintf "Welcome to the Internet Relay Network %s" nick];
         "002", [Printf.sprintf "Your host is %s, running %s" !server_name server_version];
@@ -193,7 +194,8 @@ module Make : FUNC =
     (** send the MOTD **)
     let send_motd user_info targ =
       let pfx = Some (Msg.Prefix_server !server_name) in
-      List.enum (_MOTD user_info.Database.nick_name)
+      let nick = user_info.Database.nick_name in
+      List.enum (motd_list_for nick)
       |> Enum.map (fun (cmd, params) -> {
                        Msg.raw_pfx = pfx;
                        Msg.raw_cmd = cmd;
@@ -292,7 +294,7 @@ module Make : FUNC =
                           Msg.raw_pfx = Some prefix;
                           Msg.raw_cmd = "PRIVMSG";
                           Msg.raw_params = [name; what] })
-               >>= ok);
+               >> ok_);
 
       end
 
@@ -303,7 +305,7 @@ module Make : FUNC =
     (** initialize the child actor **)
     let init () = Waiting (None, None)
 
-    (** process just a string input **)
+    (** process string input **)
     let rec recv s =
       match CharParser.parse Msg_parse.message s with
       | Bad _ -> MonadEx.nop (* ignore malformed messages *)
@@ -316,11 +318,14 @@ module Make : FUNC =
             let msg = with_server_prefix (msg_of_nick nick) in
             send_msg_back msg
 
-    (** extract relevant information out of message **)
+    (** dispatch to command handler **)
     and recv_msg msg =
       let cmd = msg.Msg.raw_cmd in
       let params = msg.Msg.raw_params in
-      or_default_prefix msg.Msg.raw_pfx >>= fun prefix ->
+      (* or_default_prefix msg.Msg.raw_pfx >>= fun prefix -> *)
+      (*   -- for now, ignore given prefix; we can't trust it until
+              we support multiple nodes + oper status etc. *)
+      default_prefix >>= fun prefix ->
       try
         Hashtbl.find commands cmd prefix params
       with Not_found ->
