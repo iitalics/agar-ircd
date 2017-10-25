@@ -16,8 +16,8 @@ module Console = struct
 
   let get_con () = 0
   let get_host () = "tty.repl"
-  let get_s () = Ref.oget_exn state
-  let put_s s () = state := Some s
+  let get_st () = Ref.oget_exn state
+  let put_st s () = state := Some s
   let on_users f () = f user_db
   let mut_users f () = f user_db
 

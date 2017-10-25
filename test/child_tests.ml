@@ -7,7 +7,7 @@ module Mock = struct
   module DB = Database.Hash_DB
 
   type logger = {
-      mutable state : Child.state;
+      mutable state : Child.st;
       users : DB.user_db;
       outputs : (int, Text.t) Hashtbl.t;
     }
@@ -21,8 +21,8 @@ module Mock = struct
 
     let get_con lo = 0
     let get_host lo = "mock.client"
-    let get_s lo = lo.state
-    let put_s s lo = lo.state <- s
+    let get_st lo = lo.state
+    let put_st s lo = lo.state <- s
     let mut_users f lo = f lo.users
     let on_users f lo = f lo.users
 

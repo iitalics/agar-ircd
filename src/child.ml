@@ -1,7 +1,7 @@
 open Batteries
 open Irc_common
 
-type state
+type st
   = Waiting of (user_name * string) option * nick_name option
   | Logged_in of nick_name
 
@@ -11,9 +11,9 @@ module type MONAD = sig
   module DB : Database.SIG
 
   (** gets the child's state **)
-  val get_s : state t
+  val get_st : st t
   (** sets the child's state **)
-  val put_s : state -> unit t
+  val put_st : st -> unit t
 
   (** the connection ID of this child's connection **)
   val get_con : int t
@@ -36,7 +36,7 @@ module type FUNC =
   functor(M : MONAD) -> sig
 
     (** get a new initial state **)
-    val init : unit -> state
+    val init : unit -> st
     (** callback when a child recieves a message (CR LF terminated string) **)
     val recv : string -> unit M.t
     (** callback when the connection is disconnected **)
@@ -111,7 +111,7 @@ module Make : FUNC =
       M.send c (Msg.to_string msg)
 
     let get_nick_opt =
-      M.get_s =>
+      M.get_st =>
         function
         | Waiting (_, o_nick) -> o_nick
         | Logged_in n -> Some n
@@ -152,7 +152,7 @@ module Make : FUNC =
         | Bad e -> bad e
         | Ok args ->
            if must_login then
-             M.get_s >>= function
+             M.get_st >>= function
              | Waiting _ -> bad (ERR._NOTREGISTERED)
              | Logged_in _ -> fn prefix args
            else
@@ -208,7 +208,7 @@ module Make : FUNC =
          M.on_users (DB.user_exists ~nick:nick) >>= fun exists ->
          if exists then
            (* nick name in use *)
-           M.put_s (Waiting (maybe_user_real, None))
+           M.put_st (Waiting (maybe_user_real, None))
            >> bad (ERR._NICKNAMEINUSE nick)
          else
            (* ok to log in! *)
@@ -222,7 +222,7 @@ module Make : FUNC =
                Database.modes = [] }
            in
            M.mut_users (DB.add_user ~nick:nick con (Some user_info))
-           >> M.put_s (Logged_in nick)
+           >> M.put_st (Logged_in nick)
            >> send_motd user_info con
            >> ok_
 
@@ -230,7 +230,7 @@ module Make : FUNC =
          nickname access across the entire network ???? *)
 
       | _ ->
-         M.put_s (Waiting (maybe_user_real, maybe_nick))
+         M.put_st (Waiting (maybe_user_real, maybe_nick))
          >> ok_
 
 
@@ -246,7 +246,7 @@ module Make : FUNC =
         (**[  command: USER  ]**)
         define_command "USER" ~args:four
           (fun _ (user, _, _, real) ->
-           M.get_s >>= function
+           M.get_st >>= function
            | Waiting (None, cur_nick) ->
               try_log_in (Some (user, real)) cur_nick
            | _ ->
@@ -261,7 +261,7 @@ module Make : FUNC =
             else if not (Msg_parse.nickname_is_valid nick) then
               bad (ERR._ERRONEOUSNICKNAME nick)
             else
-              M.get_s >>= function
+              M.get_st >>= function
               | Waiting (cur_user, None) ->
                  try_log_in cur_user (Some nick)
               | _ -> (* TODO: allow nick change while logged in? *)
@@ -328,7 +328,7 @@ module Make : FUNC =
 
     (** handle the client disconnecting **)
     let discon =
-      M.get_s >>= function
+      M.get_st >>= function
       | Logged_in nick ->
          M.mut_users (DB.del_user ~nick:nick)
          >> MonadEx.nop
