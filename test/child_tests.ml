@@ -62,7 +62,6 @@ let run_mock actions ~expect:expected =
             | `add_user (con, nick, nfo) ->
                Mock.DB.add_user nick con nfo
                  (lo.Mock.users)
-
           )
    with
      Mock.PrematureQuit ->
@@ -117,7 +116,14 @@ let quit_test _ = begin
       [`send "NICK milo\r\n";
        `send "USER me * * :Name\r\n";
        `send "QUIT\r\n"]
-      [`no_user "milo"]
+      [`no_user "milo"];
+
+    run_mock
+      [`send "NICK milo\r\n";
+       `add_user (99, "milo", None);
+       `send "QUIT\r\n"]
+      [`user_exists "milo"]
+
   end
 
 let err_test_1 _ = begin

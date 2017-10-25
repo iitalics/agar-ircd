@@ -328,11 +328,11 @@ module Make : FUNC =
 
     (** handle the client disconnecting **)
     let discon =
-      get_nick_opt >>= function
-      | Some nick ->
+      M.get_s >>= function
+      | Logged_in nick ->
          M.mut_users (DB.del_user ~nick:nick)
          >> MonadEx.nop
-      | None ->
-         MonadEx.nop
+
+      | _ -> MonadEx.nop
 
   end
