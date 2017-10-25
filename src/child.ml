@@ -179,16 +179,24 @@ module Make : FUNC =
 
     (* commands ******************************************)
 
-    let _MOTD srv_name =
+    let _MOTD nick =
       [
-        "375", Printf.sprintf "- %s Message of the day -" srv_name;
-        "372", "- Henlo and welcome to my OCaml IRC server.";
+        "001", [Printf.sprintf "Welcome to the Internet Relay Network %s" nick];
+        "002", [Printf.sprintf "Your host is %s, running %s" !server_name server_version];
+        "003", [Printf.sprintf "This server was created %s" server_date];
+        "004", [!server_name; server_version; "iosw"; "mov"];
+        "375", [Printf.sprintf "- %s Message of the day -" !server_name];
+        "372", ["- Henlo and welcome to my OCaml IRC server."];
       ]
 
     (** send the MOTD **)
-    let send_motd targ =
-      List.enum (_MOTD !server_name)
-      /@ (fun (cmd, str) -> with_server_prefix (Msg.simple1 cmd str))
+    let send_motd user_info targ =
+      let pfx = Some (Msg.Prefix_server !server_name) in
+      List.enum (_MOTD user_info.Database.nick_name)
+      |> Enum.map (fun (cmd, params) -> {
+                       Msg.raw_pfx = pfx;
+                       Msg.raw_cmd = cmd;
+                       Msg.raw_params = params })
       |> MonadEx.iter (send_msg targ)
 
     (** log in if the username and nick name are both set,
@@ -214,7 +222,7 @@ module Make : FUNC =
            in
            M.mut_users (DB.add_user ~nick:nick con (Some user_info))
            >> M.put_s (Logged_in nick)
-           >> send_motd con
+           >> send_motd user_info con
            >> ok_
 
       (* TODO LATER: we have to fucking synchronize
