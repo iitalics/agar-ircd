@@ -1,6 +1,7 @@
 open BatteriesThread
 open Batteries
 
+   (*
 module CLI = struct
 
   module Child_monad = struct
@@ -50,8 +51,9 @@ module CLI = struct
     | End_of_file -> ()
 
 end
-
+    *)
 
 
 let _ =
-  CLI.run ()
+  let module D = Daemon.Make(Child.Make) in
+  D.run ~port:6669 ()
