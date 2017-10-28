@@ -39,6 +39,7 @@ module Make(HF : Child.FUNC) = struct
       mutable ch_st : Child.st;
       ch_user_db : DB.user_db;
       ch_user_db_lock : CU.lock;
+      ch_junction_tasks : task CU.chan;
       ch_con_id : int;
       ch_host_name : string;
     }
@@ -87,7 +88,7 @@ module Make(HF : Child.FUNC) = struct
 
   (* child monad interface *****************************)
 
-  module Child_monad : Child.MONAD = struct
+  module Child_monad = struct
     exception Quit
 
     type 'a t = child -> 'a
@@ -112,7 +113,9 @@ module Make(HF : Child.FUNC) = struct
 
     let send dst str ch =
       Logger.fmt "# con #%d is sending %S to con #%d\n"
-        ch.ch_con_id str dst
+        ch.ch_con_id str dst;
+      CU.chan_put (Task_send (dst, str))
+        ch.ch_junction_tasks
 
     let quit ch =
       Logger.fmt "# con #%d is quitting\n"
@@ -122,14 +125,6 @@ module Make(HF : Child.FUNC) = struct
   end
 
   module H = HF(Child_monad)
-
-  let create_child ~server:sr ~host_name con_id = {
-      ch_st = H.init ();
-      ch_user_db = sr.sr_user_db;
-      ch_user_db_lock = sr.sr_user_db_lock;
-      ch_con_id = con_id;
-      ch_host_name = host_name;
-    }
 
 
   (* server object *************************************************)
@@ -175,9 +170,42 @@ module Make(HF : Child.FUNC) = struct
       | Unix.ADDR_UNIX s -> "unix:" ^ s
       | Unix.ADDR_INET (adr, port) -> Unix.string_of_inet_addr adr
     in
-    Logger.fmt "# connection from %s\n" host_name;
-    Unix.shutdown con_fd Unix.SHUTDOWN_ALL
 
+    (* child thread process *)
+    let run_child_thread con_id =
+      let ch = {
+          ch_st = H.init ();
+          ch_user_db = sr.sr_user_db;
+          ch_user_db_lock = sr.sr_user_db_lock;
+          ch_junction_tasks = sr.sr_junction_tasks;
+          ch_con_id = con_id;
+          ch_host_name = host_name;
+        }
+      in
+
+      let _MAX_READ = 512 in
+      let bs = Bytes.create _MAX_READ in
+      let rec recv i =
+        let count = Unix.recv con_fd bs i (_MAX_READ - i) [] in
+        Logger.fmt "# got %d bytes from %S\n" count host_name;
+        if Bytes.rcontains_from bs (i + count - 1) '\n' then
+          Bytes.sub_string bs 0 (i + count)
+        else
+          recv (i + count)
+      in
+
+      Logger.fmt "# connection from %S = con #%d\n" host_name con_id;
+      try
+        while true do
+          H.recv (recv 0) ch;
+        done
+      with Child_monad.Quit ->
+        CU.chan_put (Task_kill con_id)
+          sr.sr_junction_tasks
+    in
+
+    CU.chan_put (Task_spawn (con_fd, run_child_thread))
+      sr.sr_junction_tasks
 end
 
 
