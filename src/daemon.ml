@@ -45,8 +45,8 @@ module Make(HF : Child.FUNC) = struct
     type 'a t = child -> 'a
     module DB = DB
 
-    let return x ch = x
     let bind f g ch = g (f ch) ch
+    let return = const
     let map = (%)
 
     let get_st ch = ch.ch_st
@@ -73,7 +73,7 @@ module Make(HF : Child.FUNC) = struct
 
   end
 
-  (* module H = HF(Child_monad) *)
+  module H = HF(Child_monad)
 
 
   (* server object *************************************************)

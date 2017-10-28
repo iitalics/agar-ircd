@@ -2,4 +2,4 @@ S src
 S test
 B _build/**
 B +threads
-PKG oUnit batteries threads
+PKG oUnit batteries threads containers.thread
