@@ -29,6 +29,26 @@ module Make(HF : Child.FUNC) = struct
    *)
 
 
+  (* junction thread *****************************)
+
+  type task
+    = Task_send of int * string
+    | Task_spawn of (int -> unit)
+
+  (** spawn a thread that handles task from
+      the returned channel **)
+  let spawn_junction () =
+    let module Map = CCIntMap in
+
+    let tasks = CU.create_chan () in
+    let rec loop thds =
+      ()
+    in
+
+    tasks, Thread.create loop Map.empty
+
+
+
   (* child monad interface *****************************)
 
   type child = {
@@ -82,18 +102,28 @@ module Make(HF : Child.FUNC) = struct
       sr_user_db : DB.user_db;
       sr_user_db_lock : CU.lock;
       sr_fd : Unix.file_descr;
+      sr_junction_tasks : task CU.chan;
+      sr_junction_thread : Thread.t;
     }
 
   (** attempt to initialize new server **)
-  let create () =
+  let create_server () =
     try
+      (* create socket *)
       let fd = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
       Unix.bind fd (Unix.ADDR_INET (Unix.inet_addr_any, !Config.port));
       Unix.listen fd !Config.max_pending_req;
+
+      (* create junction *)
+      let jn_tasks, jn_thd = spawn_junction () in
+
+      (* create server *)
       let sr = {
           sr_user_db = DB.create_user_db !Config.initial_user_db_size;
           sr_user_db_lock = CU.create_lock ();
-          sr_fd = fd
+          sr_fd = fd;
+          sr_junction_tasks = jn_tasks;
+          sr_junction_thread = jn_thd;
         }
       in
       Logger.fmt "# listening, port=%d\n" !Config.port;
@@ -104,13 +134,13 @@ module Make(HF : Child.FUNC) = struct
       None
 
   (** tears down server socket **)
-  let teardown sr =
+  let server_teardown sr =
     Logger.fmt "# tearing down ...\n";
     Unix.shutdown sr.sr_fd Unix.SHUTDOWN_ALL
 
   (** accepts a new client (blocking), spawning the
       necessary threads etc. **)
-  let accept sr =
+  let server_accept sr =
     let con_fd, con_adr = Unix.accept sr.sr_fd in
     Unix.shutdown con_fd Unix.SHUTDOWN_ALL
 
@@ -121,13 +151,13 @@ end
 (* entry point *)
 let run () =
   let module D = Make(Child.Make) in
-  match D.create () with
+  match D.create_server () with
   | None -> ()
   | Some sr ->
      try
        while true do
          Sys.catch_break true;
-         D.accept sr
+         D.server_accept sr
        done
      with Sys.Break ->
-       D.teardown sr
+       D.server_teardown sr

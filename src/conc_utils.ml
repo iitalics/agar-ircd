@@ -20,7 +20,7 @@ let with_lock = Concurrent.sync
 type 'a chan = 'a CCBlockingQueue.t
 
 let create_chan
-      ?(size=0)
+      ?(size=1)
       () =
   CCBlockingQueue.create size
 

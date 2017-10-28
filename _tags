@@ -1,5 +1,6 @@
-<**/*>: package(batteries),   \
-        package(threads),     \
-        package(containers.thread)
+<**/*>: package(batteries),         \
+        package(threads),           \
+        package(containers.thread), \
+        package(containers.data)
 
 <test/*>: package(oUnit)
