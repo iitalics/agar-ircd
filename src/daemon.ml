@@ -21,35 +21,18 @@ end
 (** create a daemon, given a child implementation **)
 module Make(HF : Child.FUNC) = struct
 
-  (*
-- listen thread
-- send pool
-- recv thread(s)
-- send thread(s)
-   *)
-
-
-  (* junction thread *****************************)
-
   type task
     = Task_send of int * string
-    | Task_spawn of (int -> unit)
+    | Task_spawn of Unix.file_descr * (int -> unit)
+    | Task_kill of int
 
-  (** spawn a thread that handles task from
-      the returned channel **)
-  let spawn_junction () =
-    let module Map = CCIntMap in
-
-    let tasks = CU.create_chan () in
-    let rec loop thds =
-      ()
-    in
-
-    tasks, Thread.create loop Map.empty
-
-
-
-  (* child monad interface *****************************)
+  type server = {
+      sr_user_db : DB.user_db;
+      sr_user_db_lock : CU.lock;
+      sr_fd : Unix.file_descr;
+      sr_junction_tasks : task CU.chan;
+      sr_junction_thread : Thread.t;
+    }
 
   type child = {
       mutable ch_st : Child.st;
@@ -58,6 +41,50 @@ module Make(HF : Child.FUNC) = struct
       ch_con_id : int;
       ch_host_name : string;
     }
+
+
+  (* junction thread *****************************)
+
+  (** spawn a thread that handles task from
+      the returned channel **)
+  let spawn_junction () =
+    let module Map = CCIntMap in
+
+    let next_id = ref 0 in
+    let tasks = CU.create_chan () in
+
+    let rec loop thds =
+      let thds' = match CU.chan_get tasks with
+        | Task_send (con_id, msg) ->
+           (match Map.find con_id thds with
+            | None ->
+               Logger.fmt "# attempted to send to nonexistant con #%d\n" con_id
+
+            | Some (thd, fd) ->
+               let bs = Bytes.of_string msg in
+               ignore (Unix.send fd bs 0 (Bytes.length bs) []));
+           thds
+
+        | Task_spawn (fd, launch) ->
+           let con_id = !next_id in
+           next_id := con_id + 1;
+           let thd = Thread.create launch con_id in
+           Map.add con_id (thd, fd) thds
+
+        | Task_kill con_id ->
+           Map.find con_id thds
+           |> Option.may (fun (thd, fd) ->
+                  Thread.kill thd;
+                  Unix.shutdown fd Unix.SHUTDOWN_ALL);
+           Map.remove con_id thds
+      in
+      loop thds'
+    in
+
+    tasks, Thread.create loop Map.empty
+
+
+  (* child monad interface *****************************)
 
   module Child_monad : Child.MONAD = struct
     exception Quit
@@ -95,16 +122,16 @@ module Make(HF : Child.FUNC) = struct
 
   module H = HF(Child_monad)
 
+  let create_child ~server:sr ~host_name con_id = {
+      ch_st = H.init ();
+      ch_user_db = sr.sr_user_db;
+      ch_user_db_lock = sr.sr_user_db_lock;
+      ch_con_id = con_id;
+      ch_host_name = host_name;
+    }
+
 
   (* server object *************************************************)
-
-  type server = {
-      sr_user_db : DB.user_db;
-      sr_user_db_lock : CU.lock;
-      sr_fd : Unix.file_descr;
-      sr_junction_tasks : task CU.chan;
-      sr_junction_thread : Thread.t;
-    }
 
   (** attempt to initialize new server **)
   let create_server () =
@@ -142,6 +169,12 @@ module Make(HF : Child.FUNC) = struct
       necessary threads etc. **)
   let server_accept sr =
     let con_fd, con_adr = Unix.accept sr.sr_fd in
+    let host_name =
+      match con_adr with
+      | Unix.ADDR_UNIX s -> "unix:" ^ s
+      | Unix.ADDR_INET (adr, port) -> Unix.string_of_inet_addr adr
+    in
+    Logger.fmt "# connection from %s\n" host_name;
     Unix.shutdown con_fd Unix.SHUTDOWN_ALL
 
 end
