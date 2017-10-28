@@ -7,6 +7,7 @@ module DB = Database.Hash_DB
 module Config = struct
   let port = ref 6669
   let max_pending_req = ref 8
+  let task_buffer_size = ref 16
   let initial_user_db_size = ref 200
 end
 
@@ -51,7 +52,7 @@ module Make(HF : Child.FUNC) = struct
     let module Map = CCIntMap in
 
     let next_id = ref 0 in
-    let tasks = CU.create_chan () in
+    let tasks = CU.create_chan ~size:!Config.task_buffer_size () in
 
     let rec loop thds =
       let thds' = match CU.chan_get tasks with
