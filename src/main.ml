@@ -53,7 +53,6 @@ end
 
 
 let _ =
-  let module D = Daemon.Make(Child.Make) in
   Daemon.Config.port := 6669;
   Daemon.Config.max_pending_req := 16;
-  D.run ()
+  Daemon.run ()
