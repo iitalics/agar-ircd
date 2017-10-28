@@ -7,6 +7,7 @@ module DB = Database.Hash_DB
 module Config = struct
   let port = ref 6669
   let max_pending_req = ref 8
+  let initial_user_db_size = ref 200
 end
 
 
@@ -77,13 +78,9 @@ module Make(HF : Child.FUNC) = struct
   (* server thread (main thread) ********************************)
   let run () =
 
-    (* grab config *)
-    let port = !Config.port in
-    let max_pend = !Config.max_pending_req in
-
     (* init server state *)
     let srv = {
-        sr_user_db = DB.create_user_db () ;
+        sr_user_db = DB.create_user_db !Config.initial_user_db_size;
         sr_user_db_lock = CU.create_lock ();
       }
     in
@@ -96,8 +93,8 @@ module Make(HF : Child.FUNC) = struct
     in
 
     let srv_bind () =
-       Unix.bind srv_fd (Unix.ADDR_INET (Unix.inet_addr_any, port));
-       Unix.listen srv_fd max_pend
+       Unix.bind srv_fd (Unix.ADDR_INET (Unix.inet_addr_any, !Config.port));
+       Unix.listen srv_fd !Config.max_pending_req
     in
 
     let srv_teardown () =
@@ -122,7 +119,7 @@ module Make(HF : Child.FUNC) = struct
               IO.flush IO.stdout;
               srv_teardown ()));
 
-       Printf.printf "# listening, port=%d\n" port;
+       Printf.printf "# listening, port=%d\n" !Config.port;
        IO.flush IO.stdout;
 
      with Unix.Unix_error (e, blame_fn, blame_arg) ->

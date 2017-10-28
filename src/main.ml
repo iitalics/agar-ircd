@@ -1,7 +1,7 @@
 open BatteriesThread
 open Batteries
 
-module CLI = struct
+module CLI() = struct
 
   module Child_monad = struct
     exception Quit
@@ -10,7 +10,7 @@ module CLI = struct
 
     type 'a t = unit -> 'a
     let state = ref None
-    let user_db = DB.create_user_db ()
+    let user_db = DB.create_user_db 6
 
     let bind m f () = f (m ()) ()
     let return = const

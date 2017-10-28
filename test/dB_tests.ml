@@ -11,8 +11,10 @@ module Tests_for(DB : Database.SIG) = struct
       Database.modes = [ `o ];
     }
 
+  let mk_db () = DB.create_user_db 6
+
   let test1 _ =
-    let db = DB.create_user_db () in
+    let db = mk_db () in
     begin
       assert_equal (DB.user_exists "milo" db) false;
       assert_equal (DB.user_route "milo" db) None;
@@ -20,7 +22,7 @@ module Tests_for(DB : Database.SIG) = struct
     end
 
   let test2 _ =
-    let db = DB.create_user_db () in
+    let db = mk_db () in
     begin
       DB.add_user "milo" 4 None db;
       assert_equal (DB.user_exists "milo" db) true;
@@ -29,7 +31,7 @@ module Tests_for(DB : Database.SIG) = struct
     end
 
   let test3 _ =
-    let db = DB.create_user_db () in
+    let db = mk_db () in
     begin
       DB.add_user "milo" 4 (Some milo_info) db;
       assert_equal (DB.user_exists "milo" db) true;
@@ -38,7 +40,7 @@ module Tests_for(DB : Database.SIG) = struct
     end
 
   let test4 _ =
-    let db = DB.create_user_db () in
+    let db = mk_db () in
     begin
       DB.add_user "milo" 4 (Some milo_info) db;
       DB.add_user "ruby" 6 None db;
@@ -53,7 +55,7 @@ module Tests_for(DB : Database.SIG) = struct
     end
 
   let test5 _ =
-    let db = DB.create_user_db () in
+    let db = mk_db () in
     begin
       DB.add_user "milo" 4 None db;
       assert_equal (DB.user_exists "milo" db) true;

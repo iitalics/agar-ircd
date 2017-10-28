@@ -45,7 +45,7 @@ let run_mock actions ~expect:expected =
   let outputs = Hashtbl.create 30 in
   let lo = {
       Mock.state = H.init ();
-      Mock.users = Mock.DB.create_user_db ();
+      Mock.users = Mock.DB.create_user_db 6;
       Mock.outputs = outputs }
   in
 
