@@ -45,7 +45,7 @@ module Make(HF : Child.FUNC) = struct
 
     let return x ch = x
     let bind f g ch = g (f ch) ch
-    let map g f ch = g (f ch)
+    let map = (%)
 
     let get_st ch = ch.ch_st
     let put_st s ch = ch.ch_st <- s
