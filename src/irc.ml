@@ -138,4 +138,47 @@ module Msg = struct
     print out m;
     IO.close_out out
 
+  (** [of_string s] converts a string to a message. faises [Failure]
+      if the string is formatted incorrectly. *)
+  let of_string s =
+    let module SS = Substring in
+    try
+      (* parse prefix *)
+      let pfx, s' =
+        if String.starts_with s ":" then
+          let pfx_s, body_s = String.split (String.lchop ~n:1 s) ~by:" " in
+          Prefix.of_string pfx_s, body_s
+        else
+          Prefix.empty, s
+      in
+
+      (* separate spaces between words *)
+      let rec parse_args ?(first=false) s =
+        match SS.getc s with
+        | None -> []
+        | Some (' ', s') -> parse_args s'
+        | Some (':', s') when not first -> [SS.to_string s']
+        | _ ->
+           let s1, s2 = SS.splitl (fun c -> c <> ' ') s in
+           (SS.to_string s1)::parse_args s2
+      in
+      let args = parse_args ~first:true (SS.of_string s') in
+
+      (* validate command *)
+      let valid_cmd =
+        String.map
+          (fun c ->
+            if Char.is_digit c then
+              c
+            else if Char.is_letter c then
+              Char.uppercase c
+            else
+              raise (Failure "valid_cmd"))
+      in
+      { prefix = pfx;
+        command = valid_cmd (List.hd args);
+        params = List.tl args }
+    with
+      _ -> raise (Failure "Irc.Msg.of_string")
+
 end

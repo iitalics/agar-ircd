@@ -6,6 +6,14 @@ let str_eq = assert_equal ~printer:(Printf.sprintf "%S")
 let pfx_eq = assert_equal ~printer:(Printf.sprintf "%S" % Prefix.to_string)
 let msg_eq = assert_equal ~printer:(Printf.sprintf "%S" % Msg.to_string)
 
+let exn_eq e f =
+  assert_equal ~printer:Printexc.to_string
+    e
+    (try f (); assert_failure "expected exception"
+     with
+     | Assert_failure x -> raise (Assert_failure x)
+     | e' -> e')
+
 let main =
   "Irc/Msg,Prefix" >:::
     [
@@ -67,4 +75,43 @@ let main =
         pfx_eq (Prefix.of_nick_host "a" "c") (Prefix.of_string "a@c");
         pfx_eq (Prefix.of_nick "a") (Prefix.of_string "a");
         end;
+
+      (*---------------*)
+      "Msg/of_string" >::
+        begin fun _ ->
+        msg_eq (Msg.simple "QUIT" [])
+          (Msg.of_string "QUIT");
+        msg_eq (Msg.simple "PRIVMSG" ["milo"; "hi"])
+          (Msg.of_string "PRIVMSG milo hi");
+        msg_eq (Msg.simple "PRIVMSG" ["milo"; "hi"])
+          (Msg.of_string "     PRIVMSG   milo  hi     ");
+        msg_eq (Msg.simple "PRIVMSG" ["milo"; "hi"; "world"])
+          (Msg.of_string "PRIVMSG milo hi world");
+
+        msg_eq (Msg.simple "PRIVMSG" ["milo"; "hi"])
+          (Msg.of_string "PRIVMSG milo :hi");
+        msg_eq (Msg.simple "PRIVMSG" ["milo"; "hi world"])
+          (Msg.of_string "PRIVMSG milo :hi world");
+
+        msg_eq ({ (Msg.simple "PRIVMSG" ["arisu"; "hi"])
+                with Irc.prefix = Prefix.of_nick "lain" })
+          (Msg.of_string ":lain PRIVMSG arisu :hi");
+
+        msg_eq ({ (Msg.simple "PRIVMSG" ["arisu"; "hi"])
+                with Irc.prefix = Prefix.of_nick_host "lain" "wired" })
+          (Msg.of_string ":lain@wired   PRIVMSG arisu :hi");
+        end;
+
+      "Msg/of_string(errors)" >::
+        begin fun _ ->
+        exn_eq (Failure "Irc.Msg.of_string")
+          (fun _ -> Msg.of_string "");
+        exn_eq (Failure "Irc.Msg.of_string")
+          (fun _ -> Msg.of_string "BAD_CMD");
+        exn_eq (Failure "Irc.Msg.of_string")
+          (fun _ -> Msg.of_string ":nick");
+        exn_eq (Failure "Irc.Msg.of_string")
+          (fun _ -> Msg.of_string ":nick :PRIVMSG");
+        end;
+
     ]
