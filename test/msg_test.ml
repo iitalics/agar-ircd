@@ -3,13 +3,14 @@ open OUnit2
 open Irc
 
 let str_eq = assert_equal ~printer:(Printf.sprintf "%S")
+let pfx_eq = assert_equal ~printer:(Printf.sprintf "%S" % Prefix.to_string)
 let msg_eq = assert_equal ~printer:(Printf.sprintf "%S" % Msg.to_string)
 
 let main =
-  "irc_message/prefix" >:::
+  "Irc/Msg,Prefix" >:::
     [
       (*---------------*)
-      "is_empty" >::
+      "Msg/is_empty" >::
         begin fun _ ->
         assert_bool "empty is empty" @@ Prefix.is_empty Prefix.empty;
         assert_bool "non-empty nick" @@ not (Prefix.is_empty (Some "a", None, None));
@@ -18,7 +19,7 @@ let main =
         end;
 
       (*---------------*)
-      "msg_ctor" >::
+      "Msg/simple,format" >::
         begin fun _ ->
         assert_equal "FOO" @@ (Msg.simple "FOO" ["x"]).command;
         assert_equal ["x"] @@ (Msg.simple "FOO" ["x"]).params;
@@ -26,22 +27,22 @@ let main =
         end;
 
       (*---------------*)
-      "msg_print" >::
+      "Msg/to_string" >::
         begin fun _ ->
         str_eq "FOO x :y" @@
           Msg.to_string (Msg.simple "FOO" ["x"; "y"]);
         str_eq "FOO" @@
           Msg.to_string (Msg.simple "FOO" []);
 
-        str_eq ":host FOO" @@
+        str_eq ":nick FOO" @@
           Msg.to_string
-            { prefix = Prefix.of_host "host";
+            { prefix = Prefix.of_nick "nick";
               command = "FOO";
               params = [] };
 
-        str_eq ":user@host BAR :a" @@
+        str_eq ":nick@host BAR :a" @@
           Msg.to_string
-            { prefix = Prefix.of_user_host "user" "host";
+            { prefix = Prefix.of_nick_host "nick" "host";
               command = "BAR";
               params = ["a"] };
 
@@ -53,9 +54,17 @@ let main =
         end;
 
       (*---------------*)
-      "replies" >::
+      "Msg/reply" >::
         begin fun _ ->
         msg_eq (Msg.simple "123" ["nick";"wow"]) (Msg.reply 123 ["wow"] "nick");
         msg_eq (Msg.simple "404" ["niiiick";"1+1=3"]) (Msg.replyf 404 [] "1+%d=3" 1 "niiiick");
+        end;
+
+      (*---------------*)
+      "Prefix/of_string " >::
+        begin fun _ ->
+        pfx_eq (Prefix.of_triple "a" "b" "c") (Prefix.of_string "a!b@c");
+        pfx_eq (Prefix.of_nick_host "a" "c") (Prefix.of_string "a@c");
+        pfx_eq (Prefix.of_nick "a") (Prefix.of_string "a");
         end;
     ]

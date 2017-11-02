@@ -21,10 +21,10 @@ module Prefix = struct
   (** is the given prefix empty? *)
   let is_empty = ( = ) empty
 
-  (** [of_host h] creates a prefix with just hostname [h]. *)
-  let of_host hos = None, None, Some hos
-  (** [of_user_host u h] creates a prefix with username [u] and hostname [h]. *)
-  let of_user_host usr hos = None, Some usr, Some hos
+  (** [of_nick n] creates a prefix with just nickname [n]. *)
+  let of_nick nic = Some nic, None, None
+  (** [of_nick_host n h] creates a prefix with nickname [n] and hostname [h]. *)
+  let of_nick_host nic hos = Some nic, None, Some hos
   (** [of_triple n u h] creates a prefix with nickname [n],
       username [u] and hostname [h]. *)
   let of_triple nic usr hos = Some nic, Some usr, Some hos
@@ -32,15 +32,30 @@ module Prefix = struct
   (** prints a prefix as [<nick>![<user>@[<host>]]] *)
   let print out (pre_nic, pre_usr, pre_hos) =
     let open Printf in
-    pre_nic |> Option.may (fprintf out "%s!");
-    pre_usr |> Option.may (fprintf out "%s@");
-    pre_hos |> Option.may (fprintf out "%s")
+    pre_nic |> Option.may (fprintf out "%s");
+    pre_usr |> Option.may (fprintf out "!%s");
+    pre_hos |> Option.may (fprintf out "@%s")
 
   (** [to_string pfx] converts prefix [pfx] to a string using [print] *)
   let to_string pfx =
     let out = IO.output_string () in
     print out pfx;
     IO.close_out out
+
+  (** [of_string s] converts non-empty string [s] into a prefix. *)
+  let of_string s =
+    if String.contains s '@' then
+      let lhs, hos = String.split s ~by:"@" in
+      let nic, maybe_usr =
+        if String.contains lhs '!' then
+          let nic, usr = String.split lhs ~by:"!" in
+          nic, Some usr
+        else
+          lhs, None
+      in
+      Some nic, maybe_usr, Some hos
+    else
+      Some s, None, None
 
 end
 
