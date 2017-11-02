@@ -36,12 +36,14 @@ module type IMPL =
    Implementation of actor
  *)
 module Impl(M : MONAD) = struct
+  module Ex = Monad.Extra(M)
+  open Ex
 
   type st
     = Guest | User
 
   let on_init () = M.pure Guest
-  let on_quit st = M.pure ()
+  let on_quit st = pure_
   let on_recieve st _ = M.pure st
 
 end
