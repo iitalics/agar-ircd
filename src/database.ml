@@ -26,7 +26,7 @@ type host
   | Host_here of user_details
 
 type user_entry = {
-    gent_con : con;
+    uent_con : con;
     uent_nick : string option;
   }
 
