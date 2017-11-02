@@ -7,6 +7,7 @@ open Batteries
 
 type nick_name = string
 type user_name = string
+type real_name = string
 type host_name = string
 
 type prefix = nick_name option * user_name option * host_name option

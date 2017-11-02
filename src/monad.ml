@@ -17,6 +17,12 @@ module Extra(M : SIG) = struct
   let ( >>= ) = M.bind
   let ( >> ) a b = a >>= fun _ -> b
 
+  (** no-op computation with no result *)
+  let pure_ = M.pure ()
+
+  (** ignore result of computation *)
+  let void m = m >> pure_
+
   (** iterate through a list, carrying monadic
       effects for each element. *)
   let rec m_iter f = function
