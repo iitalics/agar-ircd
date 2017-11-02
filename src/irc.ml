@@ -92,6 +92,14 @@ module Msg = struct
         reply n (pre @ [s]))
       fmt
 
+  (** [is_reply m] returns true if [m] is a reply message,
+      e.g. has a 3-digit command name. *)
+  let is_reply m =
+    String.length m.command = 3
+    && Char.is_digit m.command.[0]
+    && Char.is_digit m.command.[1]
+    && Char.is_digit m.command.[2]
+
   (** prints in a format that can be parsed back. *)
   let print out m =
     let open Printf in
