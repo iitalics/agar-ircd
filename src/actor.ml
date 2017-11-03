@@ -9,15 +9,26 @@ open Irc
 module type MONAD = sig
   include Monad.SIG
 
+  (** returns the connection id of this actor's connection. *)
   val get_con : DB.con t
-  val send_msg : DB.con -> msg -> unit t
-  (* val should_close : bool -> unit t *)
 
+  (** returns the connection id of the parent node to this
+      connection, if any. *)
   val get_parent_con : DB.con option t
+
+  (** returns this server's nick name, used to identify themself
+      with other servers. *)
   val get_server_name : nick_name t
 
+  (** [with_users f] / [with_guests f] applies the pure function [f]
+      to the users / guests database, returning the result. *)
   val with_users : (DB.Users.t -> 'a) -> 'a t
   val with_guests : (DB.Guests.t -> 'a) -> 'a t
+
+  (** [send_msg c msg] sends message [m] to connection [c]. *)
+  val send_msg : DB.con -> msg -> unit t
+
+  (* val should_close : bool -> unit t *)
 
 end
 
