@@ -27,7 +27,7 @@ module Mock = struct
     let get_con st = 0, st
 
     let send_msg c msg st =
-      let msg_txt = Text.of_string (Irc.Msg.to_string msg) in
+      let msg_txt = Text.of_string (Irc.Msg.to_string msg ^ "\r\n") in
       (),
       { st with sent = ConMap.modify_def
                          Text.empty
@@ -44,6 +44,24 @@ module Mock = struct
 
   module A = Actor.Impl(Mock_monad)
 
+  (** [run_result m] runs monad [m], returning the
+      resulting value. *)
+  let run_result (m : 'a Mock_monad.t) =
+    fst (m empty_state)
+
+  (** [run_state m] runs monad [m], returning the
+      state after the monad is run. *)
+  let run_state (m : 'a Mock_monad.t) =
+    snd (m empty_state)
+
+  (** [run_sent c m] runs monad [m], returning all
+      of the data sent to connection [c]. *)
+  let run_sent c (m : 'a Mock_monad.t) =
+    let sent = (snd (m empty_state)).sent in
+    try
+      Text.to_string
+        (ConMap.find c sent)
+    with Not_found -> ""
 end
 
 
