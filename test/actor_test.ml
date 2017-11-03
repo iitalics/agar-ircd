@@ -10,11 +10,6 @@ module Mock = struct
       guests : DB.Guests.t;
       sent : Text.t ConMap.t }
 
-  let empty_state =
-    { users = DB.Users.empty;
-      guests = DB.Guests.empty;
-      sent = ConMap.empty }
-
   (** mock monad for actors *)
   module Mock_monad = struct
 
@@ -53,22 +48,37 @@ module Mock = struct
 
   (** [run_result m] runs monad [m], returning the
       resulting value. *)
-  let run_result (m : 'a Mock_monad.t) =
-    fst (m empty_state)
+  let run_result
+        ?(guests=DB.Guests.empty)
+        ?(users=DB.Users.empty)
+        (m : 'a Mock_monad.t) =
+    fst (m { guests = guests;
+             users = users;
+             sent = ConMap.empty })
 
   (** [run_state m] runs monad [m], returning the
       state after the monad is run. *)
-  let run_state (m : 'a Mock_monad.t) =
-    snd (m empty_state)
+  let run_state
+        ?(guests=DB.Guests.empty)
+        ?(users=DB.Users.empty)
+        (m : 'a Mock_monad.t) =
+    snd (m { guests = guests;
+             users = users;
+             sent = ConMap.empty })
 
   (** [run_sent c m] runs monad [m], returning all
       of the data sent to connection [c]. *)
-  let run_sent c (m : 'a Mock_monad.t) =
-    let sent = (snd (m empty_state)).sent in
+  let run_sent
+        ?(guests=DB.Guests.empty)
+        ?(users=DB.Users.empty)
+        c (m : 'a Mock_monad.t) =
+    let sent = (snd (m { guests = guests;
+                         users = users;
+                         sent = ConMap.empty })).sent in
     try
-      Text.to_string
-        (ConMap.find c sent)
+      Text.to_string (ConMap.find c sent)
     with Not_found -> ""
+
 end
 
 (* pretty printers *)
@@ -122,6 +132,17 @@ let main =
         let st2 = Mock.run_state (MM.seq [MA.on_init (); MA.on_quit ()]) in
         assert_bool "must not contain entry for con #0"
           (Option.is_none @@ DB.Guests.by_con 0 st2.Mock.guests);
+
+        let lain = { DB.uent_con = 0;
+                     DB.uent_nick = "lain";
+                     DB.uent_host = DB.Host_there ("wired", 1) }
+        in
+        let st3 = Mock.run_state
+                    ~users:(DB.Users.insert lain DB.Users.empty)
+                    (MA.on_quit ()) in
+        assert_bool "must not contain user entry for con #0"
+          (Option.is_none @@ DB.Users.by_con 0 st3.Mock.users);
+
 
         end;
 
