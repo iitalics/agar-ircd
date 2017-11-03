@@ -70,21 +70,22 @@ module MM = Mock.Mock_monad
 module MA = Mock.A
 
 let main =
+  let open Irc in
   "actor" >:::
     [
       "Mock/send" >::
         begin fun _ ->
         str_eq "HELLO :world\r\n"
-          (Mock.run_sent 6 (MM.send_msg 6 @@ Irc.Msg.simple "HELLO" ["world"]));
+          (Mock.run_sent 6 (MM.send_msg 6 @@ Msg.simple "HELLO" ["world"]));
         str_eq "HELLO :world\r\n"
-          (Mock.run_sent 0 (MA.send_msg_back @@ Irc.Msg.simple "HELLO" ["world"]));
+          (Mock.run_sent 0 (MA.send_msg_back @@ Msg.simple "HELLO" ["world"]));
         str_eq "421 * ABC :Unknown command\r\n"
           (Mock.run_sent 0 (MA.send_reply_back @@ Replies._UNKNOWNCOMMAND "ABC"));
         end;
 
       "Mock/server_prefix" >::
         begin fun _ ->
-        pfx_eq (Irc.Prefix.of_nick "mockserv.agar.irc")
+        pfx_eq (Prefix.of_nick "mockserv.agar.irc")
           (Mock.run_result MA.get_server_prefix);
         end;
     ]

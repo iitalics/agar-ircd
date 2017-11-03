@@ -1,6 +1,7 @@
 open Batteries
 module DB = Database
 module RPL = Replies
+open Irc
 
 (**
     Actor-capable monad extension
@@ -9,11 +10,11 @@ module type MONAD = sig
   include Monad.SIG
 
   val get_con : DB.con t
-  val send_msg : DB.con -> Irc.msg -> unit t
+  val send_msg : DB.con -> msg -> unit t
   (* val should_close : bool -> unit t *)
 
   val get_parent_con : DB.con option t
-  val get_server_name : Irc.nick_name t
+  val get_server_name : nick_name t
 
   val with_users : (DB.Users.t -> 'a) -> 'a t
   val with_guests : (DB.Guests.t -> 'a) -> 'a t
@@ -28,7 +29,7 @@ module type IMPL =
 
     val on_init : unit -> unit M.t
     val on_quit : unit -> unit M.t
-    val on_recieve : Irc.msg -> unit M.t
+    val on_recieve : msg -> unit M.t
 
   end
 
@@ -65,13 +66,13 @@ module Impl(M : MONAD) = struct
 
   let get_server_prefix =
     let%map snic = get_server_name in
-    Irc.Prefix.of_nick
+    Prefix.of_nick
       (Printf.sprintf "%s.%s"
          snic
-         !Irc.server_domain)
+         !server_domain)
 
   let with_server_prefix msg =
-    get_server_prefix => fun pfx -> { msg with Irc.prefix = pfx }
+    get_server_prefix => fun pfx -> { msg with prefix = pfx }
 
 
   (* sending messages ***********)
@@ -93,7 +94,7 @@ module Impl(M : MONAD) = struct
   (* implementation: recieve message ************)
   let on_recieve msg =
     get_nick_aster
-    => RPL._UNKNOWNCOMMAND msg.Irc.command
+    => RPL._UNKNOWNCOMMAND msg.command
     >>= with_server_prefix
     >>= send_msg_back
 
