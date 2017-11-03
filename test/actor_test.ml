@@ -62,9 +62,16 @@ module Mock = struct
     with Not_found -> ""
 end
 
-
+(* convenience assertions *)
 let str_eq = assert_equal ~printer:(Printf.sprintf "%S")
 let pfx_eq = assert_equal ~printer:(Printf.sprintf "%S" % Irc.Prefix.to_string)
+let contains =
+  assert_equal
+    ~cmp:(fun exp real ->
+      Result.catch (String.find real) exp
+      |> Result.is_ok)
+    ~pp_diff:(fun pp (exp, real) ->
+      Format.fprintf pp "expected to find needle %S in haystack %S" exp real)
 
 module MM = Mock.Mock_monad
 module MA = Mock.A
@@ -87,5 +94,11 @@ let main =
         begin fun _ ->
         pfx_eq (Prefix.of_nick "mockserv.agar.irc")
           (Mock.run_result MA.get_server_prefix);
+        end;
+
+      "unknown command" >::
+        begin fun _ ->
+        contains "421 * IDK :Unknown command\r\n"
+          (Mock.run_sent 0 (MA.on_recieve @@ Irc.Msg.simple "IDK" []));
         end;
     ]

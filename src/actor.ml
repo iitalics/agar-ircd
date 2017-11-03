@@ -92,10 +92,17 @@ module Impl(M : MONAD) = struct
   let on_quit () = pure_
 
   (* implementation: recieve message ************)
+
   let on_recieve msg =
-    get_nick_aster
-    => RPL._UNKNOWNCOMMAND msg.command
-    >>= with_server_prefix
-    >>= send_msg_back
+    let handler _ _ =
+      bad (RPL._UNKNOWNCOMMAND msg.command)
+    in
+    match%bind handler msg.prefix msg.params with
+    | Ok () -> pure_
+    | Bad rpl ->
+       get_nick_aster
+       => rpl
+       >>= with_server_prefix
+       >>= send_msg_back
 
 end
