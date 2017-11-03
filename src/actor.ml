@@ -69,6 +69,14 @@ module Impl(M : MONAD) = struct
   end
 
   (* polling user/server info **********)
+  let is_guest =
+    let%bind c = get_con in
+    with_guests (Option.is_some % DB.Guests.by_con c)
+
+  let is_user =
+    let%bind c = get_con in
+    with_users (Option.is_some % DB.Users.by_con c)
+
   let get_nick_opt =
     let%bind c = get_con in
     match%bind (with_guests @@ DB.Guests.by_con c) with
@@ -105,8 +113,18 @@ module Impl(M : MONAD) = struct
     send_reply c rpl
 
   (* implementation: setup/teardown ************)
-  let on_init () = pure_
-  let on_quit () = pure_
+  let on_init () =
+    let%bind c = get_con in
+    mut_guests (DB.Guests.insert
+                  { DB.gent_con = c;
+                    DB.gent_nick = None;
+                    DB.gent_user = None;
+                    DB.gent_real = None })
+
+  let on_quit () =
+    let%bind c = get_con in
+    mut_guests (DB.Guests.modify c @@ const None)
+    >> mut_users (DB.Users.modify c @@ const None)
 
 
   (* implementation: recieve message ************)

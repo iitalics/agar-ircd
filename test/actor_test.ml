@@ -107,6 +107,18 @@ let main =
           (Mock.run_result MA.get_server_prefix);
         end;
 
+      "Mock/on_init,on_quit" >::
+        begin fun _ ->
+        let st1 = Mock.run_state (MA.on_init ()) in
+        assert_bool "must contain guest entry for con #0"
+          (Option.is_some @@ DB.Guests.by_con 0 st1.Mock.guests);
+
+        let st2 = Mock.run_state (MM.seq [MA.on_init (); MA.on_quit ()]) in
+        assert_bool "must not contain entry for con #0"
+          (Option.is_none @@ DB.Guests.by_con 0 st2.Mock.guests);
+
+        end;
+
       "unknown command" >::
         begin fun _ ->
         contains "421 * IDK :Unknown command\r\n"
