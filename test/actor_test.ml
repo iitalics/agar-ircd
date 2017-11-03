@@ -162,6 +162,20 @@ let main =
           (Mock.run_sent (MA.on_recieve @@ Msg.simple "IDK" []));
         end;
 
+      "parameter count" >::
+        begin fun _ ->
+        let n_params cmd n =
+          for i = 0 to (n - 1) do
+            contains ~msg:(Printf.sprintf "%d args to %S" i cmd)
+              (Printf.sprintf "* %s :Not enough parameters\r\n" cmd)
+              (Mock.run_sent
+                 (MA.on_recieve @@ Msg.simple cmd (List.make i "xyz")));
+          done
+        in
+        n_params "CAP" 1;
+        n_params "USER" 4;
+        end;
+
       "command:CAP" >::
         begin fun _ ->
         contains_all ["CAP * LS :\r\n";

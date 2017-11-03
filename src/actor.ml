@@ -146,7 +146,7 @@ module Impl(M : MONAD) = struct
     | "LS"::_ -> send_msg_back (Msg.simple "CAP" ["*"; "LS"; ""]) >> ok_
     | "LIST"::_ -> send_msg_back (Msg.simple "CAP" ["*"; "LIST"; ""]) >> ok_
     | c::_ -> bad (RPL._INVALIDCAPCMD c)
-    | []   -> bad (RPL._INVALIDCAPCMD "?")
+    | _    -> bad (RPL._NEEDMOREPARAMS "CAP")
 
 
   (**
