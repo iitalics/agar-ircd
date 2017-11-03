@@ -12,6 +12,8 @@ type host_name = string
 
 type prefix = nick_name option * user_name option * host_name option
 
+let server_domain = ref "agar.irc"
+
 (** messages prefixes *)
 module Prefix = struct
   type t = prefix

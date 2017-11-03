@@ -1,9 +1,9 @@
 open Batteries
 open OUnit2
 module DB = Database
+module ConMap = Map.Make(DB.Con)
 
 module Mock = struct
-  module ConMap = Map.Make(Int)
 
   type st =
     { users : DB.Users.t;
@@ -23,6 +23,7 @@ module Mock = struct
     let bind m f st = let x, st' = m st in f x st'
     let map f m st = let x, st' = m st in f x, st'
 
+    let get_server_name st = "mockserv", st
     let get_parent_con st = None, st
     let get_con st = 0, st
 
@@ -34,11 +35,8 @@ module Mock = struct
                          c (fun txt -> Text.append txt msg_txt)
                          st.sent }
 
-    let with_users f st =
-      f st.users, st
-
-    let with_guests f st =
-      f st.guests, st
+    let with_users f st = f st.users, st
+    let with_guests f st = f st.guests, st
 
   end
 
@@ -65,7 +63,17 @@ module Mock = struct
 end
 
 
+let str_eq = assert_equal ~printer:(Printf.sprintf "%S")
+let pfx_eq = assert_equal ~printer:(Printf.sprintf "%S" % Irc.Prefix.to_string)
+
+module MA = Mock.A
+
 let main =
   "actor" >:::
     [
+      "Mock/server_prefix" >::
+        begin fun _ ->
+        pfx_eq (Irc.Prefix.of_nick "mockserv.agar.irc")
+          (Mock.run_result MA.get_server_prefix);
+        end;
     ]
