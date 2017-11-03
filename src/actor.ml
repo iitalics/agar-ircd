@@ -43,6 +43,8 @@ module Impl(M : MONAD) = struct
   open Ex
   open Res
 
+  let ok_ : (unit, RPL.reply) result M.t = pure (Ok ())
+
   module Let_syntax = struct
     let bind m ~f = M.bind m f
     let map m ~f = M.map f m

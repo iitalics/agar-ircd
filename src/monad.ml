@@ -38,6 +38,9 @@ end
 *)
 module Result(M : SIG) = struct
 
+  let ok x = M.pure (Ok x)
+  let bad y = M.pure (Bad y)
+
   let ( >>=? ) mr f =
     M.bind mr
       (function
