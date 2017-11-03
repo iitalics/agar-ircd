@@ -6,6 +6,7 @@ open Batteries
 module type SIG = sig
   type 'a t
   val pure : 'a -> 'a t
+  val map : ('a -> 'b) -> 'a t -> 'b t
   val bind : 'a t -> ('a -> 'b t) -> 'b t
 end
 
@@ -16,6 +17,7 @@ module Extra(M : SIG) = struct
 
   let ( >>= ) = M.bind
   let ( >> ) a b = a >>= fun _ -> b
+  let ( => ) f m = M.map m f
 
   (** no-op computation with no result *)
   let pure_ = M.pure ()

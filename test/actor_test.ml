@@ -21,6 +21,7 @@ module Mock = struct
     type 'a t = st -> 'a * st
     let pure x st = x, st
     let bind m f st = let x, st' = m st in f x st'
+    let map f m st = let x, st' = m st in f x, st'
 
     let get_parent_con st = None, st
     let get_con st = 0, st
