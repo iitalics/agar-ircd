@@ -1,6 +1,5 @@
 <**/*>: package(batteries),         \
         package(threads),           \
-        package(containers.thread), \
-        package(containers.data)
+        package(ppx_let)
 
 <test/*>: package(oUnit)

@@ -41,13 +41,19 @@ module Impl(M : MONAD) = struct
   open Ex
   open Res
 
+  module Let_syntax = struct
+    let bind m ~f = M.bind m f
+  end
+
   (* polling user info **********)
   let get_nick_opt =
-    get_con >>= fun c ->
-    with_guests (DB.Guests.by_con c) >>= function
-    | Some ge -> pure (ge.DB.gent_nick)
-    | None -> with_users (DB.Users.by_con c) =>
-                Option.map (fun ue -> ue.DB.uent_nick)
+    let%bind c = get_con in
+    match%bind (with_guests @@ DB.Guests.by_con c) with
+    | Some ge ->
+       pure (ge.DB.gent_nick)
+    | None ->
+       (with_users @@ DB.Users.by_con c) =>
+         Option.map (fun ue -> ue.DB.uent_nick)
 
   let get_nick_aster =
     get_nick_opt => Option.default "*"
@@ -55,7 +61,7 @@ module Impl(M : MONAD) = struct
 
   (* sending messages ***********)
   let send_msg_back msg =
-    get_con >>= fun c ->
+    let%bind c = get_con in
     send_msg c msg
 
   let send_reply c rpl =
@@ -71,6 +77,7 @@ module Impl(M : MONAD) = struct
 
   (* implementation: recieve message ************)
   let on_recieve msg =
-    send_reply_back (RPL._UNKNOWNCOMMAND msg.Irc.command)
+    send_reply_back
+      (RPL._UNKNOWNCOMMAND msg.Irc.command)
 
 end
