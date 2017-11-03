@@ -100,6 +100,15 @@ let contains =
 let contains_all ns h =
   List.iter (fun n -> contains n h) ns
 
+(* objects for use in tests *)
+let lain = { DB.uent_con = 0;
+             DB.uent_nick = "lain";
+             DB.uent_host = DB.Host_there ("wired", 1) }
+
+let just_lain =
+  DB.Users.insert lain DB.Users.empty
+
+
 module MM = Mock.Mock_monad
 module MA = Mock.A
 
@@ -133,12 +142,8 @@ let main =
         assert_bool "must not contain entry for con #0"
           (Option.is_none @@ DB.Guests.by_con 0 st2.Mock.guests);
 
-        let lain = { DB.uent_con = 0;
-                     DB.uent_nick = "lain";
-                     DB.uent_host = DB.Host_there ("wired", 1) }
-        in
         let st3 = Mock.run_state
-                    ~users:(DB.Users.insert lain DB.Users.empty)
+                    ~users:just_lain
                     (MA.on_quit ()) in
         assert_bool "must not contain user entry for con #0"
           (Option.is_none @@ DB.Users.by_con 0 st3.Mock.users);
@@ -166,22 +171,29 @@ let main =
       "command:USER" >::
         begin fun _ ->
         let msg1 = Msg.simple "USER" ["foo"; "*"; "*"; "Foo"] in
-        let msg2 = Msg.simple "USER" ["milo"; "*"; "*"; "Milo"] in
+        let msg2 = Msg.simple "USER" ["lain"; "*"; "*"; "Lain"] in
         let st1 = Mock.run_state
                     (MM.seq [MA.on_init();
                              MA.on_recieve msg1;
                              MA.on_recieve msg2])
         in
-        match DB.Guests.by_con 0 st1.Mock.guests with
-        | Some milo ->
-           assert_equal ~printer:(pp_opt qq) (Some "milo")
-             milo.DB.gent_user;
-           assert_equal ~printer:(pp_opt qq) (Some "Milo")
-             milo.DB.gent_real;
+        begin match DB.Guests.by_con 0 st1.Mock.guests with
+        | Some lain ->
+           assert_equal ~printer:(pp_opt qq) (Some "lain")
+             lain.DB.gent_user;
+           assert_equal ~printer:(pp_opt qq) (Some "Lain")
+             lain.DB.gent_real;
            assert_equal ~printer:(pp_opt qq) None
-             milo.DB.gent_nick;
+             lain.DB.gent_nick;
         | None ->
            assert_failure "no guest entry"
+        end;
+
+        let msg3 = Msg.simple "USER" ["arisu"; "*"; "*"; "Arisu"] in
+        contains "462 lain :You may not reregister"
+          (Mock.run_sent
+             ~users:just_lain
+             0 (MA.on_recieve msg3));
 
         end;
     ]
