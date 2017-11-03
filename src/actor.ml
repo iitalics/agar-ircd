@@ -1,5 +1,6 @@
 open Batteries
 module DB = Database
+module RPL = Replies
 
 (**
     Actor-capable monad extension
@@ -35,10 +36,41 @@ module type IMPL =
  *)
 module Impl(M : MONAD) = struct
   module Ex = Monad.Extra(M)
+  module Res = Monad.Result(M)
+  open M
   open Ex
+  open Res
 
+  (* polling user info **********)
+  let get_nick_opt =
+    get_con >>= fun c ->
+    with_guests (DB.Guests.by_con c) >>= function
+    | Some ge -> pure (ge.DB.gent_nick)
+    | None -> with_users (DB.Users.by_con c) =>
+                Option.map (fun ue -> ue.DB.uent_nick)
+
+  let get_nick_aster =
+    get_nick_opt => Option.default "*"
+
+
+  (* sending messages ***********)
+  let send_msg_back msg =
+    get_con >>= fun c ->
+    send_msg c msg
+
+  let send_reply c rpl =
+    get_nick_aster >>= (send_msg c % rpl)
+
+  let send_reply_back rpl =
+    get_nick_aster >>= (send_msg_back % rpl)
+
+
+  (* implementation: setup/teardown ************)
   let on_init () = pure_
   let on_quit () = pure_
-  let on_recieve _ = pure_
+
+  (* implementation: recieve message ************)
+  let on_recieve msg =
+    send_reply_back (RPL._UNKNOWNCOMMAND msg.Irc.command)
 
 end
