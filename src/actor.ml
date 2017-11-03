@@ -102,11 +102,21 @@ module Impl(M : MONAD) = struct
   let on_init () = pure_
   let on_quit () = pure_
 
+
   (* implementation: recieve message ************)
 
+  (**
+     client command:CAP
+   *)
+  let cmd_CAP prefix = function
+    | "LS"::_ -> send_msg_back (Msg.simple "CAP" ["*"; "LS"; ""]) >> ok_
+    | c::_ -> bad (RPL._INVALIDCAPCMD c)
+    | []   -> bad (RPL._INVALIDCAPCMD "?")
+
   let on_recieve msg =
-    let handler _ _ =
-      bad (RPL._UNKNOWNCOMMAND msg.command)
+    let handler = match msg.command with
+      | "CAP" -> cmd_CAP
+      | cmd -> fun _ _ -> bad (RPL._UNKNOWNCOMMAND cmd)
     in
     match%bind handler msg.prefix msg.params with
     | Ok () -> pure_

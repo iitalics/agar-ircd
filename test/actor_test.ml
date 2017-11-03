@@ -38,6 +38,12 @@ module Mock = struct
     let with_users f st = f st.users, st
     let with_guests f st = f st.guests, st
 
+    let seq (ms : 'a t list) =
+      List.fold_right
+        (fun m m' -> bind m (fun _ -> m'))
+        ms
+        (fun st -> (), st)
+
   end
 
   module A = Actor.Impl(Mock_monad)
@@ -72,6 +78,8 @@ let contains =
       |> Result.is_ok)
     ~pp_diff:(fun pp (exp, real) ->
       Format.fprintf pp "expected to find needle %S in haystack %S" exp real)
+let contains_all ns h =
+  List.iter (fun n -> contains n h) ns
 
 module MM = Mock.Mock_monad
 module MA = Mock.A
@@ -99,6 +107,15 @@ let main =
       "unknown command" >::
         begin fun _ ->
         contains "421 * IDK :Unknown command\r\n"
-          (Mock.run_sent 0 (MA.on_recieve @@ Irc.Msg.simple "IDK" []));
+          (Mock.run_sent 0 (MA.on_recieve @@ Msg.simple "IDK" []));
         end;
+
+      "command:CAP" >::
+        begin fun _ ->
+        contains_all ["CAP * LS :\r\n";
+                      "410 * FOO :Invalid CAP command\r\n"]
+          (Mock.run_sent 0
+             (MM.seq [MA.on_recieve @@ Msg.simple1 "CAP" "LS";
+                      MA.on_recieve @@ Msg.simple1 "CAP" "FOO"]));
+        end
     ]
