@@ -12,8 +12,8 @@ module type MONAD = sig
   val send_msg : DB.con -> Irc.msg -> unit t
   (* val should_close : bool -> unit t *)
 
-  (* val with_users : ?mut:bool -> (DB.users -> 'a) -> 'a t *)
-  (* val with_guests : ?mut:bool -> (DB.guests -> 'a) -> 'a t *)
+  val with_users : (DB.Users.t -> 'a) -> 'a t
+  val with_guests : (DB.Guests.t -> 'a) -> 'a t
 
 end
 

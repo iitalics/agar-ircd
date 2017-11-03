@@ -33,6 +33,12 @@ module Mock = struct
                          c (fun txt -> Text.append txt msg_txt)
                          st.sent }
 
+    let with_users f st =
+      f st.users, st
+
+    let with_guests f st =
+      f st.guests, st
+
   end
 
   module A = Actor.Impl(Mock_monad)

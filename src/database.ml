@@ -63,17 +63,17 @@ module Users = struct
   (** [by_con c users] returns [Some ue], where [ue] is the
       user entry with connection id [c], or [None] if that
       connection is not a user. *)
-  let by_con c (us, _) =
+  let by_con c ((us, _) : t) =
     try
-      Some (ConM.find us c)
+      Some (ConM.find c us)
     with Not_found -> None
 
   (** [by_nick nick users] returns [Some ue], where [ue] is the
       user entry with nickname [nick], or [None] if that nick
       does not exist. *)
-  let by_nick nic (us, ns) =
+  let by_nick nic ((us, ns) : t) =
     try
-      Some (ConM.find us (StrM.find ns nic))
+      Some (ConM.find (StrM.find nic ns) us)
     with Not_found -> None
 
 end
