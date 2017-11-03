@@ -38,6 +38,9 @@ module Mock = struct
     let with_users f st = f st.users, st
     let with_guests f st = f st.guests, st
 
+    let mut_users f st = (), { st with users = f st.users }
+    let mut_guests f st = (), { st with guests = f st.guests }
+
     let seq (ms : 'a t list) =
       List.fold_right
         (fun m m' -> bind m (fun _ -> m'))

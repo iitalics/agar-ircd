@@ -25,6 +25,12 @@ module type MONAD = sig
   val with_users : (DB.Users.t -> 'a) -> 'a t
   val with_guests : (DB.Guests.t -> 'a) -> 'a t
 
+  (** [mut_users f] / [mut_guests f] mutates the database by applying
+      the pure function [f] to the users / guests database, changing
+      it to the result. *)
+  val mut_users : (DB.Users.t -> DB.Users.t) -> unit t
+  val mut_guests : (DB.Guests.t -> DB.Guests.t) -> unit t
+
   (** [send_msg c msg] sends message [m] to connection [c]. *)
   val send_msg : DB.con -> msg -> unit t
 
