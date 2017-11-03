@@ -71,12 +71,13 @@ module Mock = struct
   let run_sent
         ?(guests=DB.Guests.empty)
         ?(users=DB.Users.empty)
-        c (m : 'a Mock_monad.t) =
+        ?(targ=0)
+        (m : 'a Mock_monad.t) =
     let sent = (snd (m { guests = guests;
                          users = users;
                          sent = ConMap.empty })).sent in
     try
-      Text.to_string (ConMap.find c sent)
+      Text.to_string (ConMap.find targ sent)
     with Not_found -> ""
 
 end
@@ -119,11 +120,11 @@ let main =
       "Mock/send" >::
         begin fun _ ->
         str_eq "HELLO :world\r\n"
-          (Mock.run_sent 6 (MM.send_msg 6 @@ Msg.simple "HELLO" ["world"]));
+          (Mock.run_sent ~targ:6 (MM.send_msg 6 @@ Msg.simple "HELLO" ["world"]));
         str_eq "HELLO :world\r\n"
-          (Mock.run_sent 0 (MA.send_msg_back @@ Msg.simple "HELLO" ["world"]));
+          (Mock.run_sent (MA.send_msg_back @@ Msg.simple "HELLO" ["world"]));
         str_eq "421 * ABC :Unknown command\r\n"
-          (Mock.run_sent 0 (MA.send_reply_back @@ Replies._UNKNOWNCOMMAND "ABC"));
+          (Mock.run_sent (MA.send_reply_back @@ Replies._UNKNOWNCOMMAND "ABC"));
         end;
 
       "Mock/server_prefix" >::
@@ -154,7 +155,7 @@ let main =
       "unknown command" >::
         begin fun _ ->
         contains "421 * IDK :Unknown command\r\n"
-          (Mock.run_sent 0 (MA.on_recieve @@ Msg.simple "IDK" []));
+          (Mock.run_sent (MA.on_recieve @@ Msg.simple "IDK" []));
         end;
 
       "command:CAP" >::
@@ -162,7 +163,7 @@ let main =
         contains_all ["CAP * LS :\r\n";
                       "CAP * LIST :\r\n";
                       "410 * FOO :Invalid CAP command\r\n"]
-          (Mock.run_sent 0
+          (Mock.run_sent
              (MM.seq [MA.on_recieve @@ Msg.simple1 "CAP" "LS";
                       MA.on_recieve @@ Msg.simple1 "CAP" "LIST";
                       MA.on_recieve @@ Msg.simple1 "CAP" "FOO"]));
@@ -193,7 +194,7 @@ let main =
         contains "462 lain :You may not reregister"
           (Mock.run_sent
              ~users:just_lain
-             0 (MA.on_recieve msg3));
+             (MA.on_recieve msg3));
 
         end;
     ]
