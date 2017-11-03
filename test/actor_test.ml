@@ -125,6 +125,10 @@ let main =
           (Mock.run_sent (MA.send_msg_back @@ Msg.simple "HELLO" ["world"]));
         str_eq "421 * ABC :Unknown command\r\n"
           (Mock.run_sent (MA.send_reply_back @@ Replies._UNKNOWNCOMMAND "ABC"));
+        str_eq "421 lain ABC :Unknown command\r\n"
+          (Mock.run_sent
+             ~users:just_lain
+             (MA.send_reply_back @@ Replies._UNKNOWNCOMMAND "ABC"));
         end;
 
       "Mock/server_prefix" >::
