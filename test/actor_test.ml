@@ -128,9 +128,11 @@ let main =
       "command:CAP" >::
         begin fun _ ->
         contains_all ["CAP * LS :\r\n";
+                      "CAP * LIST :\r\n";
                       "410 * FOO :Invalid CAP command\r\n"]
           (Mock.run_sent 0
              (MM.seq [MA.on_recieve @@ Msg.simple1 "CAP" "LS";
+                      MA.on_recieve @@ Msg.simple1 "CAP" "LIST";
                       MA.on_recieve @@ Msg.simple1 "CAP" "FOO"]));
         end
     ]

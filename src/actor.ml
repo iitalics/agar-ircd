@@ -134,6 +134,7 @@ module Impl(M : MONAD) = struct
    *)
   let cmd_CAP prefix = function
     | "LS"::_ -> send_msg_back (Msg.simple "CAP" ["*"; "LS"; ""]) >> ok_
+    | "LIST"::_ -> send_msg_back (Msg.simple "CAP" ["*"; "LIST"; ""]) >> ok_
     | c::_ -> bad (RPL._INVALIDCAPCMD c)
     | []   -> bad (RPL._INVALIDCAPCMD "?")
 
