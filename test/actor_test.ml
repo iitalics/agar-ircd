@@ -71,9 +71,15 @@ module Mock = struct
     with Not_found -> ""
 end
 
+(* pretty printers *)
+let qq = Printf.sprintf "%S"
+let pp_opt f = function
+  | None -> "None"
+  | Some x -> "Some(" ^ f x ^ ")"
+
 (* convenience assertions *)
-let str_eq = assert_equal ~printer:(Printf.sprintf "%S")
-let pfx_eq = assert_equal ~printer:(Printf.sprintf "%S" % Irc.Prefix.to_string)
+let str_eq = assert_equal ~printer:qq
+let pfx_eq = assert_equal ~printer:(qq % Irc.Prefix.to_string)
 let contains =
   assert_equal
     ~cmp:(fun exp real ->
@@ -134,5 +140,27 @@ let main =
              (MM.seq [MA.on_recieve @@ Msg.simple1 "CAP" "LS";
                       MA.on_recieve @@ Msg.simple1 "CAP" "LIST";
                       MA.on_recieve @@ Msg.simple1 "CAP" "FOO"]));
-        end
+        end;
+
+      "command:USER" >::
+        begin fun _ ->
+        let msg1 = Msg.simple "USER" ["foo"; "*"; "*"; "Foo"] in
+        let msg2 = Msg.simple "USER" ["milo"; "*"; "*"; "Milo"] in
+        let st1 = Mock.run_state
+                    (MM.seq [MA.on_init();
+                             MA.on_recieve msg1;
+                             MA.on_recieve msg2])
+        in
+        match DB.Guests.by_con 0 st1.Mock.guests with
+        | Some milo ->
+           assert_equal ~printer:(pp_opt qq) (Some "milo")
+             milo.DB.gent_user;
+           assert_equal ~printer:(pp_opt qq) (Some "Milo")
+             milo.DB.gent_real;
+           assert_equal ~printer:(pp_opt qq) None
+             milo.DB.gent_nick;
+        | None ->
+           assert_failure "no guest entry"
+
+        end;
     ]

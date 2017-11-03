@@ -68,14 +68,25 @@ module Impl(M : MONAD) = struct
     let map m ~f = M.map f m
   end
 
-  (* polling user/server info **********)
-  let is_guest =
-    let%bind c = get_con in
-    with_guests (Option.is_some % DB.Guests.by_con c)
 
-  let is_user =
+  (* polling user/server info **********)
+
+  let get_guest_entry =
     let%bind c = get_con in
-    with_users (Option.is_some % DB.Users.by_con c)
+    with_guests (DB.Guests.by_con c)
+  let get_user_entry =
+    let%bind c = get_con in
+    with_users (DB.Users.by_con c)
+
+  let mod_guest_entry f =
+    let%bind c = get_con in
+    mut_guests (DB.Guests.modify c f)
+  let mod_user_entry f =
+    let%bind c = get_con in
+    mut_users (DB.Users.modify c f)
+
+  let is_guest = get_guest_entry => Option.is_some
+  let is_user =  get_user_entry => Option.is_some
 
   let get_nick_opt =
     let%bind c = get_con in
@@ -112,6 +123,7 @@ module Impl(M : MONAD) = struct
     let%bind c = get_con in
     send_reply c rpl
 
+
   (* implementation: setup/teardown ************)
   let on_init () =
     let%bind c = get_con in
@@ -127,23 +139,44 @@ module Impl(M : MONAD) = struct
     >> mut_users (DB.Users.modify c @@ const None)
 
 
-  (* implementation: recieve message ************)
-
   (**
-     client command:CAP
+     client command: CAP
    *)
-  let cmd_CAP prefix = function
+  let cmd_CAP = function
     | "LS"::_ -> send_msg_back (Msg.simple "CAP" ["*"; "LS"; ""]) >> ok_
     | "LIST"::_ -> send_msg_back (Msg.simple "CAP" ["*"; "LIST"; ""]) >> ok_
     | c::_ -> bad (RPL._INVALIDCAPCMD c)
     | []   -> bad (RPL._INVALIDCAPCMD "?")
 
+
+  (**
+     client command: USER
+   *)
+  let cmd_USER = function
+    | usr::_::_::real::_ ->
+       if%bind is_guest then
+         mod_guest_entry
+           (fun ge -> Some { ge
+                        with DB.gent_user = Some usr;
+                             DB.gent_real = Some real })
+         >> ok_
+       else
+         bad RPL._ALREADYREGISTERED
+
+    | _ -> bad (RPL._NEEDMOREPARAMS "USER")
+
+
+
+  (* implementation: recieve message ************)
+
   let on_recieve msg =
+    (* TOOD: are we always gonna throw the prefix away? *)
     let handler = match msg.command with
       | "CAP" -> cmd_CAP
-      | cmd -> fun _ _ -> bad (RPL._UNKNOWNCOMMAND cmd)
+      | "USER" -> cmd_USER
+      | cmd -> fun _ -> bad (RPL._UNKNOWNCOMMAND cmd)
     in
-    match%bind handler msg.prefix msg.params with
+    match%bind handler msg.params with
     | Ok () -> pure_
     | Bad rpl ->
        get_nick_aster
