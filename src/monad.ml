@@ -36,14 +36,16 @@ end
 *)
 module Result(M : SIG) = struct
 
-  let ( >>=? ) r f =
-    match r with
-    | Ok x -> f x
-    | Bad b -> Bad b
+  let ( >>=? ) mr f =
+    M.bind mr
+      (function
+       | Ok x -> f x
+       | Bad b -> M.pure (Bad b))
 
-  let ( >>? ) r f =
-    match r with
-    | Ok _ -> f
-    | Bad b -> Bad b
+  let ( >>? ) mr m' =
+    M.bind mr
+      (function
+       | Ok _ -> m'
+       | Bad b -> M.pure (Bad b))
 
 end
