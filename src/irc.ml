@@ -22,15 +22,15 @@ module Prefix = struct
   let is_empty = ( = ) empty
 
   (** [of_nick n] creates a prefix with just nickname [n]. *)
-  let of_nick nic = Some nic, None, None
+  let of_nick nic : t = Some nic, None, None
   (** [of_nick_host n h] creates a prefix with nickname [n] and hostname [h]. *)
-  let of_nick_host nic hos = Some nic, None, Some hos
+  let of_nick_host nic hos : t = Some nic, None, Some hos
   (** [of_triple n u h] creates a prefix with nickname [n],
       username [u] and hostname [h]. *)
-  let of_triple nic usr hos = Some nic, Some usr, Some hos
+  let of_triple nic usr hos : t = Some nic, Some usr, Some hos
 
   (** prints a prefix as [<nick>![<user>@[<host>]]] *)
-  let print out (pre_nic, pre_usr, pre_hos) =
+  let print out ((pre_nic, pre_usr, pre_hos) : t) =
     let open Printf in
     pre_nic |> Option.may (fprintf out "%s");
     pre_usr |> Option.may (fprintf out "!%s");
@@ -43,7 +43,7 @@ module Prefix = struct
     IO.close_out out
 
   (** [of_string s] converts non-empty string [s] into a prefix. *)
-  let of_string s =
+  let of_string s : t =
     if String.contains s '@' then
       let lhs, hos = String.split s ~by:"@" in
       let nic, maybe_usr =
